@@ -1,0 +1,1140 @@
+const STORAGE_KEY = "php-finance-tracker-v1";
+
+const DEFAULT_CATEGORIES = {
+  expense: [
+    { id: "food", name: "Food", icon: "Food", budget: 10000 },
+    { id: "grocery", name: "Grocery", icon: "Groc", budget: 12000 },
+    { id: "personal", name: "Personal", icon: "Pers", budget: 10000 },
+    { id: "car", name: "Car", icon: "Car", budget: 3000 },
+    { id: "bills", name: "Bills", icon: "Bill", budget: 38000 },
+    { id: "card", name: "Card", icon: "Card", budget: 0 },
+    { id: "medicine", name: "Medicine", icon: "Med", budget: 2000 },
+    { id: "living-costs", name: "Living Costs", icon: "Live", budget: 50000 }
+  ],
+  income: [
+    { id: "salary", name: "Salary", icon: "Pay" },
+    { id: "interest", name: "Interest", icon: "%" },
+    { id: "investment", name: "Investment", icon: "Inv" },
+    { id: "bonus", name: "Bonus", icon: "+" },
+    { id: "part-time", name: "Part-time job", icon: "Job" },
+    { id: "dividend", name: "Dividend", icon: "Div" }
+  ],
+  saving: [
+    { id: "emergency", name: "Emergency", icon: "Emer" },
+    { id: "general", name: "General", icon: "Gen" },
+    { id: "investment-saving", name: "Investment", icon: "Inv" },
+    { id: "travel", name: "Travel", icon: "Trip" }
+  ]
+};
+
+const DEFAULT_GOALS = [
+  { id: "emergency", name: "Emergency Fund", target: 50000 },
+  { id: "general", name: "General Savings", target: 25000 }
+];
+
+const DEFAULT_ASSETS = [
+  { id: "landbank", date: "2026-03-09", account: "LandBank", balance: 152.54 },
+  { id: "gcash", date: "2026-03-09", account: "GCash", balance: 23988.35 },
+  { id: "gsave", date: "2026-03-09", account: "GSave", balance: 160177.26 },
+  { id: "ginvest", date: "2026-03-09", account: "GInvest", balance: 993.33 },
+  { id: "metrobank", date: "2026-03-09", account: "Metrobank", balance: 24504.89 },
+  { id: "bdo-savings", date: "2026-03-09", account: "BDO Savings", balance: 22177.22 },
+  { id: "bpi-uitf", date: "2026-03-09", account: "BPI UITF", balance: 2108519.19 }
+];
+
+let state = loadState();
+let currentMonth = getMonthKey(new Date());
+let selectedDate = toDateInputValue(new Date());
+let historyYear = new Date().getFullYear();
+let entryType = "expense";
+let selectedCategory = state.categories.expense[0].id;
+let assetsEditMode = false;
+let categoryEditMode = false;
+let transactionEditMode = false;
+let editingTransactionId = "";
+let activeClusterIndex = 0;
+let selectedEntryClusterId = "";
+
+const peso = new Intl.NumberFormat("en-PH", {
+  style: "currency",
+  currency: "PHP",
+  maximumFractionDigits: 2
+});
+
+const els = {
+  screenTitle: document.querySelector("#screen-title"),
+  monthLabel: document.querySelector("#month-label"),
+  monthPrev: document.querySelector("#month-prev"),
+  monthNext: document.querySelector("#month-next"),
+  navButtons: document.querySelectorAll(".bottom-nav button"),
+  screens: document.querySelectorAll(".screen"),
+  form: document.querySelector("#transaction-form"),
+  amount: document.querySelector("#amount"),
+  amountPrefix: document.querySelector("#amount-prefix"),
+  note: document.querySelector("#note"),
+  date: document.querySelector("#date"),
+  time: document.querySelector("#time"),
+  entryClusterRow: document.querySelector("#entry-cluster-row"),
+  entryCluster: document.querySelector("#entry-cluster"),
+  categoryChips: document.querySelector("#category-chips"),
+  typeButtons: document.querySelectorAll(".segmented button"),
+  homeIncome: document.querySelector("#home-income"),
+  homeExpenses: document.querySelector("#home-expenses"),
+  openHistory: document.querySelector("#open-history"),
+  backSummary: document.querySelector("#back-summary"),
+  historyPrev: document.querySelector("#history-prev"),
+  historyNext: document.querySelector("#history-next"),
+  historyYear: document.querySelector("#history-year"),
+  historyBudgeted: document.querySelector("#history-budgeted"),
+  historySpent: document.querySelector("#history-spent"),
+  historyDifference: document.querySelector("#history-difference"),
+  historyList: document.querySelector("#history-list"),
+  summaryClusterPrev: document.querySelector("#summary-cluster-prev"),
+  summaryClusterNext: document.querySelector("#summary-cluster-next"),
+  summaryClusterName: document.querySelector("#summary-cluster-name"),
+  summaryClusterSpent: document.querySelector("#summary-cluster-spent"),
+  homeBudgetBars: document.querySelector("#home-budget-bars"),
+  calendarGrid: document.querySelector("#calendar-grid"),
+  selectedDateTitle: document.querySelector("#selected-date-title"),
+  selectedDateTotal: document.querySelector("#selected-date-total"),
+  selectedDateList: document.querySelector("#selected-date-list"),
+  toggleTransactionEdit: document.querySelector("#toggle-transaction-edit"),
+  transactionModal: document.querySelector("#transaction-modal"),
+  transactionEditForm: document.querySelector("#transaction-edit-form"),
+  closeTransactionModal: document.querySelector("#close-transaction-modal"),
+  editTransactionType: document.querySelector("#edit-transaction-type"),
+  editTransactionCategory: document.querySelector("#edit-transaction-category"),
+  editTransactionClusterRow: document.querySelector("#edit-transaction-cluster-row"),
+  editTransactionCluster: document.querySelector("#edit-transaction-cluster"),
+  editTransactionPrefix: document.querySelector("#edit-transaction-prefix"),
+  editTransactionAmount: document.querySelector("#edit-transaction-amount"),
+  editTransactionTime: document.querySelector("#edit-transaction-time"),
+  editTransactionDate: document.querySelector("#edit-transaction-date"),
+  editTransactionNote: document.querySelector("#edit-transaction-note"),
+  deleteTransaction: document.querySelector("#delete-transaction"),
+  budgetClusterPrev: document.querySelector("#budget-cluster-prev"),
+  budgetClusterNext: document.querySelector("#budget-cluster-next"),
+  budgetClusterName: document.querySelector("#budget-cluster-name"),
+  budgetClusterSpent: document.querySelector("#budget-cluster-spent"),
+  budgetClusterRemaining: document.querySelector("#budget-cluster-remaining"),
+  clusterActions: document.querySelector("#cluster-actions"),
+  renameCluster: document.querySelector("#rename-cluster"),
+  addCluster: document.querySelector("#add-cluster"),
+  removeCluster: document.querySelector("#remove-cluster"),
+  budgetList: document.querySelector("#budget-list"),
+  toggleCategoryEdit: document.querySelector("#toggle-category-edit"),
+  addCategory: document.querySelector("#add-category"),
+  assetsList: document.querySelector("#assets-list"),
+  assetTotal: document.querySelector("#asset-total"),
+  assetTitle: document.querySelector("#asset-title"),
+  addAsset: document.querySelector("#add-asset"),
+  toggleAssetsEdit: document.querySelector("#toggle-assets-edit"),
+  exportCsv: document.querySelector("#export-csv"),
+  exportAssetsCsv: document.querySelector("#export-assets-csv"),
+  exportBackup: document.querySelector("#export-backup"),
+  importBackup: document.querySelector("#import-backup")
+};
+
+initialize();
+
+function initialize() {
+  ensureMonthBudget(currentMonth);
+  setDateTimeDefaults();
+  bindEvents();
+  render();
+
+  if ("serviceWorker" in navigator && ["http:", "https:"].includes(location.protocol)) {
+    navigator.serviceWorker.register("service-worker.js");
+  }
+}
+
+function bindEvents() {
+  els.navButtons.forEach((button) => {
+    button.addEventListener("click", () => showScreen(button.dataset.screen));
+  });
+
+  els.monthPrev.addEventListener("click", () => changeMonth(-1));
+  els.monthNext.addEventListener("click", () => changeMonth(1));
+  els.summaryClusterPrev.addEventListener("click", () => changeCluster(-1));
+  els.summaryClusterNext.addEventListener("click", () => changeCluster(1));
+  els.budgetClusterPrev.addEventListener("click", () => changeCluster(-1));
+  els.budgetClusterNext.addEventListener("click", () => changeCluster(1));
+  els.openHistory.addEventListener("click", () => showScreen("history-screen"));
+  els.backSummary.addEventListener("click", () => showScreen("summary-screen"));
+  els.historyPrev.addEventListener("click", () => {
+    historyYear -= 1;
+    renderHistory();
+  });
+  els.historyNext.addEventListener("click", () => {
+    historyYear += 1;
+    renderHistory();
+  });
+  els.calendarGrid.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-date]");
+    if (!button) return;
+    selectedDate = button.dataset.date;
+    transactionEditMode = false;
+    renderCalendar();
+    renderSelectedDateTransactions();
+  });
+  els.toggleTransactionEdit.addEventListener("click", () => {
+    transactionEditMode = !transactionEditMode;
+    if (!transactionEditMode) closeTransactionModal();
+    renderSelectedDateTransactions();
+  });
+  els.selectedDateList.addEventListener("click", handleTransactionAction);
+  els.transactionEditForm.addEventListener("submit", saveEditedTransaction);
+  els.closeTransactionModal.addEventListener("click", closeTransactionModal);
+  els.transactionModal.addEventListener("click", (event) => {
+    if (event.target === els.transactionModal) closeTransactionModal();
+  });
+  els.editTransactionType.addEventListener("change", () => {
+    populateEditClusters(els.editTransactionDate.value);
+    populateEditCategories(els.editTransactionType.value, els.editTransactionCluster.value, els.editTransactionDate.value);
+    els.editTransactionPrefix.textContent = els.editTransactionType.value === "expense" ? "- PHP" : "+ PHP";
+  });
+  els.editTransactionCluster.addEventListener("change", () => {
+    populateEditCategories(els.editTransactionType.value, els.editTransactionCluster.value, els.editTransactionDate.value);
+  });
+  els.editTransactionDate.addEventListener("change", () => {
+    populateEditClusters(els.editTransactionDate.value);
+    populateEditCategories(els.editTransactionType.value, els.editTransactionCluster.value, els.editTransactionDate.value);
+  });
+  els.deleteTransaction.addEventListener("click", deleteEditingTransaction);
+
+  els.typeButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      entryType = button.dataset.type;
+      selectedCategory = getEntryCategories()[0]?.id || "";
+      renderEntry();
+    });
+  });
+  els.entryCluster.addEventListener("change", () => {
+    selectedEntryClusterId = els.entryCluster.value;
+    selectedCategory = getEntryCategories()[0]?.id || "";
+    renderEntry();
+  });
+
+  els.form.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveTransaction();
+  });
+
+  els.toggleCategoryEdit.addEventListener("click", () => {
+    categoryEditMode = !categoryEditMode;
+    renderBudget();
+  });
+  els.addCategory.addEventListener("click", addCategory);
+  els.renameCluster.addEventListener("click", renameCluster);
+  els.addCluster.addEventListener("click", addCluster);
+  els.removeCluster.addEventListener("click", removeCluster);
+  els.addAsset.addEventListener("click", addAsset);
+  els.toggleAssetsEdit.addEventListener("click", () => {
+    assetsEditMode = !assetsEditMode;
+    renderAssets();
+  });
+  els.assetsList.addEventListener("click", handleAssetAction);
+  els.assetsList.addEventListener("change", handleAssetFieldChange);
+  els.exportCsv.addEventListener("click", exportCsv);
+  els.exportAssetsCsv.addEventListener("click", exportAssetsCsv);
+  els.exportBackup.addEventListener("click", exportBackup);
+  els.importBackup.addEventListener("change", importBackup);
+}
+
+function showScreen(screenId) {
+  els.screens.forEach((screen) => screen.classList.toggle("active", screen.id === screenId));
+  els.navButtons.forEach((button) => button.classList.toggle("active", button.dataset.screen === screenId));
+  const activeButton = [...els.navButtons].find((button) => button.dataset.screen === screenId);
+  els.screenTitle.textContent = activeButton?.querySelector("span")?.textContent || "Summary";
+  if (screenId === "add-screen") {
+    els.amount.focus();
+  }
+}
+
+function changeMonth(offset) {
+  const [year, month] = currentMonth.split("-").map(Number);
+  const date = new Date(year, month - 1 + offset, 1);
+  currentMonth = getMonthKey(date);
+  selectedDate = selectedDate.startsWith(currentMonth) ? selectedDate : `${currentMonth}-01`;
+  ensureMonthBudget(currentMonth);
+  clampClusterIndex();
+  render();
+}
+
+function changeCluster(offset) {
+  const clusters = getBudgetClusters(state.budgets[currentMonth]);
+  activeClusterIndex = (activeClusterIndex + offset + clusters.length) % clusters.length;
+  selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
+  renderHomeBudgetBars();
+  renderEntry();
+  renderBudget();
+}
+
+function render() {
+  ensureMonthBudget(currentMonth);
+  els.monthLabel.textContent = monthLong(currentMonth);
+  renderHome();
+  renderEntry();
+  renderBudget();
+  renderAssets();
+  renderHistory();
+}
+
+function renderHome() {
+  const totals = getMonthTotals(currentMonth);
+  els.homeIncome.textContent = formatMoney(totals.income);
+  els.homeExpenses.textContent = formatMoney(totals.expense);
+  renderHomeBudgetBars();
+
+  renderCalendar();
+  renderSelectedDateTransactions();
+}
+
+function renderHomeBudgetBars() {
+  const budget = state.budgets[currentMonth];
+  const cluster = getActiveCluster(budget);
+  const clusterTotals = getClusterTotals(currentMonth, cluster);
+  els.summaryClusterName.textContent = cluster.name;
+  els.summaryClusterSpent.textContent = `Spent ${formatMoney(clusterTotals.spent)}`;
+  els.homeBudgetBars.innerHTML = getClusterCategoryIds(cluster)
+    .map((categoryId) => {
+      const category = findCategory("expense", categoryId);
+      const limit = cluster.categories[categoryId] ?? 0;
+      const spent = getCategorySpent(currentMonth, categoryId, cluster.id);
+      const remaining = limit - spent;
+      const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+      const capped = Math.min(100, Math.max(0, percent));
+      const statusClass = percent >= 100 ? "over" : percent >= 80 ? "warning" : "";
+      return `
+        <article class="home-budget-row">
+          <div class="home-budget-labels">
+            <strong>${category?.name || "Uncategorized"}</strong>
+            <span class="${remaining < 0 ? "amount-negative" : ""}">
+              ${remaining < 0 ? "Over " : "Remaining "}${formatMoney(Math.abs(remaining))}
+            </span>
+          </div>
+          <div class="progress-track compact">
+            <div class="progress-fill ${statusClass}" style="--width:${capped}%"></div>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+}
+
+function renderCalendar() {
+  const [year, month] = currentMonth.split("-").map(Number);
+  const first = new Date(year, month - 1, 1);
+  const last = new Date(year, month, 0);
+  const todayKey = toDateInputValue(new Date());
+  const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
+  const cells = weekdays.map((day) => `<div class="calendar-cell weekday">${day}</div>`);
+
+  for (let i = 0; i < first.getDay(); i += 1) {
+    cells.push(`<div></div>`);
+  }
+
+  for (let day = 1; day <= last.getDate(); day += 1) {
+    const dateKey = `${currentMonth}-${String(day).padStart(2, "0")}`;
+    const spent = state.transactions
+      .filter((item) => item.date === dateKey && item.type === "expense")
+      .reduce((sum, item) => sum + item.amount, 0);
+    cells.push(`
+      <button class="calendar-cell ${dateKey === todayKey ? "today" : ""} ${dateKey === selectedDate ? "selected" : ""}" type="button" data-date="${dateKey}">
+        <strong>${day}</strong>
+        ${spent ? `<small>-${compactMoney(spent)}</small>` : ""}
+      </button>
+    `);
+  }
+
+  els.calendarGrid.innerHTML = cells.join("");
+}
+
+function renderSelectedDateTransactions() {
+  const items = state.transactions
+    .filter((item) => item.date === selectedDate)
+    .sort((a, b) => b.time.localeCompare(a.time));
+  const expenseTotal = items
+    .filter((item) => item.type === "expense")
+    .reduce((sum, item) => sum + item.amount, 0);
+
+  els.selectedDateTitle.textContent = formatDisplayDate(selectedDate);
+  els.selectedDateTotal.textContent = formatMoney(expenseTotal);
+  els.toggleTransactionEdit.textContent = transactionEditMode ? "Done" : "Edit";
+  els.toggleTransactionEdit.classList.toggle("hidden", !items.length);
+  els.selectedDateList.innerHTML = items.length
+    ? items.map(transactionTemplate).join("")
+    : `<p class="empty">No transactions on this date.</p>`;
+}
+
+function renderEntry() {
+  els.typeButtons.forEach((button) => button.classList.toggle("active", button.dataset.type === entryType));
+  els.amountPrefix.textContent = entryType === "expense" ? "-" : "+";
+  els.amountPrefix.parentElement.style.color = entryType === "expense" ? "var(--pink)" : "var(--mint-dark)";
+  renderEntryClusterSelector();
+  const categories = getEntryCategories();
+  if (!categories.some((category) => category.id === selectedCategory)) {
+    selectedCategory = categories[0]?.id || "";
+  }
+  els.categoryChips.innerHTML = categories
+    .map((category) => `
+      <button class="${category.id === selectedCategory ? "active" : ""}" type="button" data-category="${category.id}">
+        ${category.name}
+      </button>
+    `)
+    .join("");
+
+  els.categoryChips.querySelectorAll("button").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedCategory = button.dataset.category;
+      renderEntry();
+    });
+  });
+}
+
+function renderEntryClusterSelector() {
+  const isExpense = entryType === "expense";
+  els.entryClusterRow.classList.toggle("hidden", !isExpense);
+  if (!isExpense) return;
+  const clusters = getBudgetClusters(state.budgets[currentMonth]);
+  if (!clusters.some((cluster) => cluster.id === selectedEntryClusterId)) {
+    selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
+  }
+  els.entryCluster.innerHTML = clusters
+    .map((cluster) => `<option value="${cluster.id}" ${cluster.id === selectedEntryClusterId ? "selected" : ""}>${cluster.name}</option>`)
+    .join("");
+}
+
+function getEntryCategories() {
+  if (entryType !== "expense") return state.categories[entryType] || [];
+  const cluster = getClusterById(state.budgets[currentMonth], selectedEntryClusterId) || getActiveCluster(state.budgets[currentMonth]);
+  return getClusterCategoryIds(cluster)
+    .map((categoryId) => findCategory("expense", categoryId))
+    .filter(Boolean);
+}
+
+function renderBudget() {
+  const budget = state.budgets[currentMonth];
+  const cluster = getActiveCluster(budget);
+  const clusterTotals = getClusterTotals(currentMonth, cluster);
+  els.budgetClusterName.textContent = cluster.name;
+  els.budgetClusterSpent.textContent = `Spent ${formatMoney(clusterTotals.spent)}`;
+  els.budgetClusterRemaining.textContent = `${clusterTotals.remaining < 0 ? "Over" : "Remaining"} ${formatMoney(Math.abs(clusterTotals.remaining))}`;
+  els.budgetClusterRemaining.className = clusterTotals.remaining < 0 ? "amount-negative" : "";
+  els.toggleCategoryEdit.textContent = categoryEditMode ? "Done" : "Edit categories";
+  els.clusterActions.classList.toggle("hidden", !categoryEditMode);
+  els.budgetList.innerHTML = getClusterCategoryIds(cluster)
+    .map((categoryId) => {
+      const category = findCategory("expense", categoryId);
+      const limit = cluster.categories[categoryId] ?? 0;
+      const spent = getCategorySpent(currentMonth, categoryId, cluster.id);
+      const remaining = limit - spent;
+      const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+      const capped = Math.min(100, Math.max(0, percent));
+      const statusClass = percent >= 100 ? "over" : percent >= 80 ? "warning" : "";
+      return `
+        <article class="budget-card">
+          <div class="budget-row ${categoryEditMode ? "editing" : ""}">
+            ${
+              categoryEditMode
+                ? `<input class="category-name-input" value="${escapeAttribute(category?.name || "Uncategorized")}" data-category-field="name" data-category="${categoryId}" aria-label="${escapeAttribute(category?.name || "Uncategorized")} name" />`
+                : `<h3>${category?.name || "Uncategorized"}</h3>`
+            }
+            <input inputmode="decimal" value="${limit || ""}" data-budget-category="${categoryId}" aria-label="${category?.name || "Uncategorized"} budget" />
+            ${
+              categoryEditMode
+                ? `<button class="remove-icon-button" type="button" data-category-remove="${categoryId}" aria-label="Remove ${escapeAttribute(category?.name || "category")}"></button>`
+                : ""
+            }
+          </div>
+          <div class="progress-track">
+            <div class="progress-fill ${statusClass}" style="--width:${capped}%"></div>
+          </div>
+          <div class="budget-detail">
+            <span>${percent}% of ${formatMoney(limit)}</span>
+            <strong class="${remaining < 0 ? "amount-negative" : ""}">
+              ${remaining < 0 ? "Over " : "Left "}${formatMoney(Math.abs(remaining))}
+            </strong>
+          </div>
+          <div class="budget-detail">
+            <span>Spent ${formatMoney(spent)}</span>
+            <span>Budget ${formatMoney(limit)}</span>
+          </div>
+        </article>
+      `;
+    })
+    .join("");
+
+  els.budgetList.querySelectorAll("[data-budget-category]").forEach((input) => {
+    input.addEventListener("change", () => {
+      cluster.categories[input.dataset.budgetCategory] = parseAmount(input.value);
+      persist();
+      render();
+    });
+  });
+
+  els.budgetList.querySelectorAll("[data-category-field]").forEach((input) => {
+    input.addEventListener("change", () => {
+      const category = state.categories.expense.find((item) => item.id === input.dataset.category);
+      if (!category) return;
+      category.name = input.value.trim() || category.name;
+      persist();
+      render();
+    });
+  });
+
+  els.budgetList.querySelectorAll("[data-category-remove]").forEach((button) => {
+    button.addEventListener("click", () => removeCategory(button.dataset.categoryRemove));
+  });
+}
+
+function renderHistory() {
+  const monthRows = Array.from({ length: 12 }, (_, index) => {
+    const monthKey = `${historyYear}-${String(index + 1).padStart(2, "0")}`;
+    const budgeted = state.budgets[monthKey] ? sumBudgetClusters(state.budgets[monthKey]) : 0;
+    const spent = getMonthTotals(monthKey).expense;
+    return {
+      monthKey,
+      monthName: monthLong(monthKey),
+      budgeted,
+      spent,
+      difference: budgeted - spent
+    };
+  });
+
+  const totalBudgeted = monthRows.reduce((sum, row) => sum + row.budgeted, 0);
+  const totalSpent = monthRows.reduce((sum, row) => sum + row.spent, 0);
+  const totalDifference = totalBudgeted - totalSpent;
+
+  els.historyYear.textContent = historyYear;
+  els.historyBudgeted.textContent = formatMoney(totalBudgeted);
+  els.historySpent.textContent = formatMoney(totalSpent);
+  els.historyDifference.textContent = formatMoney(totalDifference);
+  els.historyDifference.className = totalDifference < 0 ? "amount-negative" : "";
+  els.historyList.innerHTML = monthRows
+    .map((row) => `
+      <article class="history-row">
+        <strong>${row.monthName}</strong>
+        <span>Budgeted ${formatMoney(row.budgeted)}</span>
+        <span>Spent ${formatMoney(row.spent)}</span>
+        <span class="${row.difference < 0 ? "amount-negative" : ""}">
+          ${row.difference < 0 ? "Over " : "Left "}${formatMoney(Math.abs(row.difference))}
+        </span>
+      </article>
+    `)
+    .join("");
+}
+
+function renderAssets() {
+  const total = state.assets.reduce((sum, asset) => sum + asset.balance, 0);
+  const trackerDate = state.assetUpdatedAt || latestAssetDate();
+  els.assetTitle.textContent = `Asset tracker (${formatDisplayDate(trackerDate)})`;
+  els.assetTotal.textContent = formatMoney(total);
+  els.toggleAssetsEdit.textContent = assetsEditMode ? "Done" : "Edit";
+  els.addAsset.classList.toggle("hidden", !assetsEditMode);
+  els.assetsList.innerHTML = `
+    <div class="asset-header ${assetsEditMode ? "editing" : ""}">
+      <span>Account</span>
+      <span>Balance</span>
+      ${assetsEditMode ? "<span>Actions</span>" : ""}
+    </div>
+    ${state.assets
+      .map((asset) => `
+        <div class="asset-row ${assetsEditMode ? "editing" : ""}">
+          ${
+            assetsEditMode
+              ? `<input class="asset-account-input" value="${escapeAttribute(asset.account)}" data-asset-field="account" data-asset="${asset.id}" aria-label="Account name" />`
+              : `<strong>${escapeHtml(asset.account)}</strong>`
+          }
+          ${
+            assetsEditMode
+              ? `<label class="asset-balance-input"><span>PHP</span><input inputmode="decimal" value="${asset.balance}" data-asset-field="balance" data-asset="${asset.id}" aria-label="${escapeAttribute(asset.account)} balance" /></label>`
+              : `<span>${formatMoney(asset.balance)}</span>`
+          }
+          ${
+            assetsEditMode
+              ? `<span class="asset-actions">
+                  <button class="remove-icon-button" type="button" data-asset-action="remove" data-asset="${asset.id}" aria-label="Remove ${escapeAttribute(asset.account)}"></button>
+                </span>`
+              : ""
+          }
+        </div>
+      `)
+      .join("")}
+  `;
+}
+
+function saveTransaction() {
+  const amount = parseAmount(els.amount.value);
+  if (entryType === "expense" && !selectedEntryClusterId) {
+    selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
+  }
+  if (!amount || !selectedCategory) return;
+
+  state.transactions.push({
+    id: crypto.randomUUID(),
+    type: entryType,
+    amount,
+    categoryId: selectedCategory,
+    clusterId: entryType === "expense" ? selectedEntryClusterId : "",
+    note: els.note.value.trim(),
+    date: els.date.value,
+    time: els.time.value,
+    createdAt: new Date().toISOString()
+  });
+
+  persist();
+  els.amount.value = "";
+  els.note.value = "";
+  selectedDate = els.date.value;
+  currentMonth = getMonthKey(new Date(`${selectedDate}T00:00:00`));
+  setDateTimeDefaults();
+  render();
+  showScreen("summary-screen");
+}
+
+function transactionTemplate(item) {
+  const category = findCategory(item.type, item.categoryId);
+  const sign = item.type === "expense" ? "-" : "+";
+  const amountClass = item.type === "expense" ? "amount-negative" : "amount-positive";
+  return `
+    <article class="transaction-item ${transactionEditMode ? "editable" : ""}" ${transactionEditMode ? `data-transaction-action="open" data-transaction="${item.id}"` : ""}>
+      <div>
+        <strong>${category?.name || "Uncategorized"}</strong>
+        <small>${item.time}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+      </div>
+      <strong class="${amountClass}">${sign}${formatMoney(item.amount)}</strong>
+    </article>
+  `;
+}
+
+function handleTransactionAction(event) {
+  const button = event.target.closest("[data-transaction-action]");
+  if (!button) return;
+  const transaction = state.transactions.find((item) => item.id === button.dataset.transaction);
+  if (!transaction) return;
+
+  if (button.dataset.transactionAction === "open") {
+    openTransactionModal(transaction.id);
+  }
+}
+
+function openTransactionModal(transactionId) {
+  const transaction = state.transactions.find((item) => item.id === transactionId);
+  if (!transaction) return;
+  editingTransactionId = transactionId;
+  els.editTransactionType.innerHTML = `
+    <option value="expense">Expense</option>
+    <option value="income">Income</option>
+  `;
+  els.editTransactionType.value = transaction.type;
+  populateEditClusters(transaction.date);
+  els.editTransactionCluster.value = transaction.type === "expense" ? getTransactionClusterId(transaction) : "";
+  populateEditCategories(transaction.type, els.editTransactionCluster.value, transaction.date);
+  els.editTransactionCategory.value = transaction.categoryId;
+  els.editTransactionPrefix.textContent = transaction.type === "expense" ? "- PHP" : "+ PHP";
+  els.editTransactionAmount.value = transaction.amount;
+  els.editTransactionTime.value = transaction.time;
+  els.editTransactionDate.value = transaction.date;
+  els.editTransactionNote.value = transaction.note || "";
+  els.transactionModal.classList.remove("hidden");
+  els.editTransactionAmount.focus();
+}
+
+function populateEditClusters(dateValue = selectedDate) {
+  const isExpense = els.editTransactionType.value === "expense";
+  els.editTransactionClusterRow.classList.toggle("hidden", !isExpense);
+  if (!isExpense) {
+    els.editTransactionCluster.innerHTML = "";
+    return;
+  }
+  const monthKey = dateValue?.slice(0, 7) || currentMonth;
+  ensureMonthBudget(monthKey);
+  els.editTransactionCluster.innerHTML = getBudgetClusters(state.budgets[monthKey])
+    .map((cluster) => `<option value="${cluster.id}">${cluster.name}</option>`)
+    .join("");
+}
+
+function populateEditCategories(type, clusterId = "", dateValue = selectedDate) {
+  const monthKey = dateValue?.slice(0, 7) || currentMonth;
+  ensureMonthBudget(monthKey);
+  const categories =
+    type === "expense"
+      ? getClusterCategoryIds(getClusterById(state.budgets[monthKey], clusterId) || getActiveCluster(state.budgets[monthKey]))
+          .map((categoryId) => findCategory("expense", categoryId))
+          .filter(Boolean)
+      : state.categories[type] || [];
+  els.editTransactionCategory.innerHTML = categories
+    .map((category) => `<option value="${category.id}">${category.name}</option>`)
+    .join("");
+}
+
+function closeTransactionModal() {
+  editingTransactionId = "";
+  els.transactionModal.classList.add("hidden");
+}
+
+function saveEditedTransaction(event) {
+  event.preventDefault();
+  const transaction = state.transactions.find((item) => item.id === editingTransactionId);
+  if (!transaction) return;
+  transaction.type = els.editTransactionType.value;
+  transaction.categoryId = els.editTransactionCategory.value;
+  transaction.clusterId = transaction.type === "expense" ? els.editTransactionCluster.value : "";
+  transaction.amount = parseAmount(els.editTransactionAmount.value);
+  transaction.time = els.editTransactionTime.value;
+  transaction.date = els.editTransactionDate.value;
+  transaction.note = els.editTransactionNote.value.trim();
+
+  selectedDate = transaction.date;
+  currentMonth = getMonthKey(new Date(`${selectedDate}T00:00:00`));
+  ensureMonthBudget(currentMonth);
+  persist();
+  closeTransactionModal();
+  render();
+}
+
+function deleteEditingTransaction() {
+  const transaction = state.transactions.find((item) => item.id === editingTransactionId);
+  if (!transaction) return;
+  if (!confirm("Delete this transaction?")) return;
+  state.transactions = state.transactions.filter((item) => item.id !== transaction.id);
+  closeTransactionModal();
+  persist();
+  render();
+}
+
+function addCategory() {
+  const cluster = getActiveCluster(state.budgets[currentMonth]);
+  const name = prompt("Category name");
+  if (!name) return;
+  const idBase = slugify(name) || "category";
+  let category = state.categories.expense.find((item) => item.id === idBase || item.name.toLowerCase() === name.trim().toLowerCase());
+  if (!category) {
+    let id = idBase;
+    let suffix = 2;
+    while (state.categories.expense.some((item) => item.id === id)) {
+      id = `${idBase}-${suffix}`;
+      suffix += 1;
+    }
+    category = { id, name: name.trim(), icon: "", budget: 0 };
+    state.categories.expense.push(category);
+  }
+
+  const budgetAmount = parseAmount(prompt("Monthly budget", "0") || "0");
+  cluster.categories[category.id] = budgetAmount;
+  persist();
+  render();
+}
+
+function removeCategory(categoryId) {
+  const category = state.categories.expense.find((item) => item.id === categoryId);
+  const cluster = getActiveCluster(state.budgets[currentMonth]);
+  if (!category) return;
+  const warning = `Remove ${category.name} from ${cluster.name}? Transactions and other clusters will not be deleted.`;
+  if (!confirm(warning)) return;
+
+  delete cluster.categories[categoryId];
+  if (selectedCategory === categoryId) {
+    selectedCategory = state.categories.expense[0]?.id || "";
+  }
+  persist();
+  render();
+}
+
+function renameCluster() {
+  const cluster = getActiveCluster(state.budgets[currentMonth]);
+  const name = prompt("Group name", cluster.name);
+  if (!name) return;
+  cluster.name = name.trim() || cluster.name;
+  persist();
+  render();
+}
+
+function addCluster() {
+  const budget = state.budgets[currentMonth];
+  const clusters = getBudgetClusters(budget);
+  const source = getActiveCluster(budget);
+  const name = prompt("New group name", `${source.name} copy`);
+  if (!name) return;
+  clusters.push({
+    id: `${slugify(name) || "cluster"}-${Date.now()}`,
+    name: name.trim(),
+    categories: structuredClone(source.categories || {})
+  });
+  activeClusterIndex = clusters.length - 1;
+  persist();
+  render();
+}
+
+function removeCluster() {
+  const budget = state.budgets[currentMonth];
+  const clusters = getBudgetClusters(budget);
+  if (clusters.length <= 1) {
+    alert("At least one budget group is required.");
+    return;
+  }
+  const cluster = getActiveCluster(budget);
+  if (!confirm(`Remove ${cluster.name}? Transactions and categories will not be deleted.`)) return;
+  clusters.splice(activeClusterIndex, 1);
+  clampClusterIndex();
+  selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
+  persist();
+  render();
+}
+
+function addAsset() {
+  const account = prompt("Account name");
+  if (!account) return;
+  const balance = parseAmount(prompt("Current balance") || "0");
+  const id = `${slugify(account)}-${Date.now()}`;
+  const date = toDateInputValue(new Date());
+  state.assets.push({ id, account, balance, date });
+  state.assetUpdatedAt = date;
+  persist();
+  render();
+}
+
+function handleAssetAction(event) {
+  const button = event.target.closest("[data-asset-action]");
+  if (!button) return;
+  const asset = state.assets.find((item) => item.id === button.dataset.asset);
+  if (!asset) return;
+
+  if (button.dataset.assetAction === "remove") {
+    if (!confirm(`Remove ${asset.account}?`)) return;
+    state.assets = state.assets.filter((item) => item.id !== asset.id);
+  }
+
+  state.assetUpdatedAt = toDateInputValue(new Date());
+  persist();
+  render();
+}
+
+function handleAssetFieldChange(event) {
+  const input = event.target.closest("[data-asset-field]");
+  if (!input) return;
+  const asset = state.assets.find((item) => item.id === input.dataset.asset);
+  if (!asset) return;
+
+  if (input.dataset.assetField === "account") {
+    asset.account = input.value.trim() || asset.account;
+  } else {
+    asset.balance = parseAmount(input.value);
+  }
+
+  asset.date = toDateInputValue(new Date());
+  state.assetUpdatedAt = asset.date;
+  persist();
+  renderAssets();
+}
+
+function exportCsv() {
+  const header = ["Date", "Time", "Type", "Group", "Category", "Amount", "Note"];
+  const rows = state.transactions.map((item) => {
+    const category = findCategory(item.type, item.categoryId);
+    const cluster = item.type === "expense" ? findTransactionCluster(item) : null;
+    return [item.date, item.time, item.type, cluster?.name || "", category?.name || "", item.amount, item.note];
+  });
+  downloadFile(`transactions-${currentMonth}.csv`, toCsv([header, ...rows]), "text/csv");
+}
+
+function exportAssetsCsv() {
+  const header = ["Tracker Date", "Account", "Balance"];
+  const trackerDate = state.assetUpdatedAt || latestAssetDate();
+  const rows = state.assets.map((asset) => [trackerDate, asset.account, asset.balance]);
+  downloadFile(`assets-${trackerDate}.csv`, toCsv([header, ...rows]), "text/csv");
+}
+
+function exportBackup() {
+  downloadFile(`finance-backup-${currentMonth}.json`, JSON.stringify(state, null, 2), "application/json");
+}
+
+function importBackup(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const imported = JSON.parse(reader.result);
+      state = normalizeState(imported);
+      ensureMonthBudget(currentMonth);
+      activeClusterIndex = 0;
+      selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
+      persist();
+      render();
+    } catch {
+      alert("That backup file could not be imported.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+function getMonthTotals(monthKey) {
+  return state.transactions
+    .filter((item) => item.date.startsWith(monthKey))
+    .reduce(
+      (totals, item) => {
+        totals[item.type] += item.amount;
+        return totals;
+      },
+      { expense: 0, income: 0, saving: 0 }
+    );
+}
+
+function getCategorySpent(monthKey, categoryId, clusterId = "") {
+  return state.transactions
+    .filter((item) => {
+      if (item.type !== "expense" || item.categoryId !== categoryId || !item.date.startsWith(monthKey)) return false;
+      if (!clusterId) return true;
+      return getTransactionClusterId(item) === clusterId;
+    })
+    .reduce((sum, item) => sum + item.amount, 0);
+}
+
+function getClusterTotals(monthKey, cluster) {
+  const budgeted = sumClusterBudget(cluster);
+  const spent = getClusterCategoryIds(cluster).reduce((sum, categoryId) => sum + getCategorySpent(monthKey, categoryId, cluster.id), 0);
+  return { budgeted, spent, remaining: budgeted - spent };
+}
+
+function ensureMonthBudget(monthKey) {
+  if (state.budgets[monthKey]) {
+    migrateBudget(state.budgets[monthKey]);
+    return;
+  }
+  const [year, month] = monthKey.split("-").map(Number);
+  const previousKey = getMonthKey(new Date(year, month - 2, 1));
+  const fallback = state.budgets[previousKey];
+  state.budgets[monthKey] = fallback
+    ? structuredClone(fallback)
+    : {
+        total: state.categories.expense.reduce((sum, category) => sum + (category.budget || 0), 0),
+        categories: Object.fromEntries(state.categories.expense.map((category) => [category.id, category.budget || 0]))
+      };
+  migrateBudget(state.budgets[monthKey]);
+  persist();
+}
+
+function loadState() {
+  const saved = localStorage.getItem(STORAGE_KEY);
+  if (!saved) return normalizeState({});
+  try {
+    return normalizeState(JSON.parse(saved));
+  } catch {
+    return normalizeState({});
+  }
+}
+
+function normalizeState(input) {
+  const categories = normalizeCategories(input.categories);
+  const budgets = input.budgets || {};
+  Object.values(budgets).forEach((budget) => migrateBudget(budget, categories));
+  return {
+    categories,
+    transactions: normalizeTransactions(input.transactions),
+    budgets,
+    goals: input.goals || structuredClone(DEFAULT_GOALS),
+    assets: Array.isArray(input.assets) ? input.assets : structuredClone(DEFAULT_ASSETS),
+    assetUpdatedAt: input.assetUpdatedAt || latestDateFromAssets(input.assets) || toDateInputValue(new Date())
+  };
+}
+
+function normalizeCategories(categories) {
+  const normalized = categories || structuredClone(DEFAULT_CATEGORIES);
+  const utilities = normalized.expense?.find((category) => category.id === "utilities");
+  if (utilities) {
+    utilities.id = "living-costs";
+    utilities.name = "Living Costs";
+    utilities.icon = "Live";
+  }
+  return normalized;
+}
+
+function normalizeTransactions(transactions) {
+  if (!Array.isArray(transactions)) return [];
+  return transactions.map((transaction, index) => {
+    const fallbackId = `transaction-${index}-${transaction.createdAt || ""}-${transaction.date || ""}-${transaction.time || ""}-${transaction.amount || 0}`;
+    const normalized = {
+      ...transaction,
+      id: transaction.id || slugify(fallbackId) || crypto.randomUUID(),
+      categoryId: transaction.categoryId === "utilities" ? "living-costs" : transaction.categoryId
+    };
+    if (normalized.type === "expense" && !normalized.clusterId) {
+      normalized.clusterId = inferTransactionClusterId(normalized);
+    }
+    return normalized;
+  });
+}
+
+function migrateBudget(budget, categoriesSource = state?.categories || DEFAULT_CATEGORIES) {
+  if (!budget) return;
+  if (Array.isArray(budget.clusters) && budget.clusters.length) {
+    budget.clusters.forEach((cluster, index) => {
+      cluster.id = cluster.id || `cluster-${index + 1}`;
+      cluster.name = cluster.name || `Cluster ${index + 1}`;
+      cluster.categories = cluster.categories || {};
+      if (cluster.categories.utilities !== undefined && cluster.categories["living-costs"] === undefined) {
+        cluster.categories["living-costs"] = cluster.categories.utilities;
+      }
+      delete cluster.categories.utilities;
+    });
+    delete budget.categories;
+    delete budget.total;
+    return;
+  }
+  const categories = budget.categories || Object.fromEntries(categoriesSource.expense.map((category) => [category.id, category.budget || 0]));
+  if (categories.utilities !== undefined && categories["living-costs"] === undefined) {
+    categories["living-costs"] = categories.utilities;
+  }
+  delete categories.utilities;
+  budget.clusters = [
+    {
+      id: "personal",
+      name: "Personal",
+      categories
+    }
+  ];
+  delete budget.categories;
+  delete budget.total;
+}
+
+function getBudgetClusters(budget) {
+  migrateBudget(budget);
+  return budget.clusters;
+}
+
+function getActiveCluster(budget) {
+  const clusters = getBudgetClusters(budget);
+  clampClusterIndex();
+  return clusters[activeClusterIndex] || clusters[0];
+}
+
+function getClusterById(budget, clusterId) {
+  return getBudgetClusters(budget).find((cluster) => cluster.id === clusterId);
+}
+
+function getClusterCategoryIds(cluster) {
+  return Object.keys(cluster?.categories || {});
+}
+
+function sumClusterBudget(cluster) {
+  return Object.values(cluster?.categories || {}).reduce((sum, value) => sum + (Number(value) || 0), 0);
+}
+
+function sumBudgetClusters(budget) {
+  return getBudgetClusters(budget).reduce((sum, cluster) => sum + sumClusterBudget(cluster), 0);
+}
+
+function clampClusterIndex() {
+  const clusters = state?.budgets?.[currentMonth]?.clusters || [];
+  if (!clusters.length) {
+    activeClusterIndex = 0;
+    return;
+  }
+  activeClusterIndex = Math.min(Math.max(activeClusterIndex, 0), clusters.length - 1);
+}
+
+function getTransactionClusterId(transaction) {
+  if (transaction.clusterId) return transaction.clusterId;
+  return inferTransactionClusterId(transaction);
+}
+
+function inferTransactionClusterId(transaction) {
+  const monthKey = transaction.date?.slice(0, 7) || currentMonth;
+  const budget = state.budgets[monthKey] || state.budgets[currentMonth];
+  if (!budget) return "";
+  const match = getBudgetClusters(budget).find((cluster) => getClusterCategoryIds(cluster).includes(transaction.categoryId));
+  return match?.id || getBudgetClusters(budget)[0]?.id || "";
+}
+
+function findTransactionCluster(transaction) {
+  const monthKey = transaction.date?.slice(0, 7) || currentMonth;
+  const budget = state.budgets[monthKey] || state.budgets[currentMonth];
+  if (!budget) return null;
+  return getClusterById(budget, getTransactionClusterId(transaction));
+}
+
+function persist() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function setDateTimeDefaults() {
+  const now = new Date();
+  els.date.value = toDateInputValue(now);
+  els.time.value = now.toTimeString().slice(0, 5);
+}
+
+function findCategory(type, id) {
+  return state.categories[type]?.find((category) => category.id === id);
+}
+
+function parseAmount(value) {
+  return Number(String(value).replace(/,/g, "")) || 0;
+}
+
+function formatMoney(value) {
+  return peso.format(value);
+}
+
+function compactMoney(value) {
+  if (value >= 1000) return `${Math.round(value / 1000)}k`;
+  return Math.round(value).toString();
+}
+
+function getMonthKey(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthLong(monthKey) {
+  const [year, month] = monthKey.split("-").map(Number);
+  return new Date(year, month - 1, 1).toLocaleDateString("en-PH", { month: "long", year: "numeric" });
+}
+
+function formatDisplayDate(value) {
+  const date = new Date(`${value}T00:00:00`);
+  return date.toLocaleDateString("en-PH", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function latestAssetDate() {
+  return latestDateFromAssets(state.assets) || toDateInputValue(new Date());
+}
+
+function latestDateFromAssets(assets) {
+  if (!Array.isArray(assets) || !assets.length) return "";
+  return assets.map((asset) => asset.date).filter(Boolean).sort().at(-1) || "";
+}
+
+function toDateInputValue(date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+function toCsv(rows) {
+  return rows
+    .map((row) => row.map((cell) => `"${String(cell ?? "").replace(/"/g, '""')}"`).join(","))
+    .join("\n");
+}
+
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
+function slugify(value) {
+  return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "");
+}
+
+function escapeHtml(value) {
+  const div = document.createElement("div");
+  div.textContent = value;
+  return div.innerHTML;
+}
+
+function escapeAttribute(value) {
+  return escapeHtml(value).replace(/"/g, "&quot;");
+}
