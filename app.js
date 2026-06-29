@@ -1,4 +1,5 @@
 const STORAGE_KEY = "php-finance-tracker-v1";
+const FEEDBACK_STORAGE_KEY = "php-finance-tracker-feedback-v1";
 
 const DEFAULT_CATEGORIES = {
   expense: [
@@ -132,7 +133,11 @@ const els = {
   exportCsv: document.querySelector("#export-csv"),
   exportAssetsCsv: document.querySelector("#export-assets-csv"),
   exportBackup: document.querySelector("#export-backup"),
-  importBackup: document.querySelector("#import-backup")
+  importBackup: document.querySelector("#import-backup"),
+  feedbackNotes: document.querySelector("#feedback-notes"),
+  saveFeedback: document.querySelector("#save-feedback"),
+  clearFeedback: document.querySelector("#clear-feedback"),
+  exportFeedback: document.querySelector("#export-feedback")
 };
 
 initialize();
@@ -140,6 +145,7 @@ initialize();
 function initialize() {
   ensureMonthBudget(currentMonth);
   setDateTimeDefaults();
+  els.feedbackNotes.value = localStorage.getItem(FEEDBACK_STORAGE_KEY) || "";
   bindEvents();
   render();
 
@@ -239,6 +245,10 @@ function bindEvents() {
   els.exportAssetsCsv.addEventListener("click", exportAssetsCsv);
   els.exportBackup.addEventListener("click", exportBackup);
   els.importBackup.addEventListener("change", importBackup);
+  els.saveFeedback.addEventListener("click", saveFeedback);
+  els.clearFeedback.addEventListener("click", clearFeedback);
+  els.exportFeedback.addEventListener("click", exportFeedback);
+  els.feedbackNotes.addEventListener("change", saveFeedback);
 }
 
 function showScreen(screenId) {
@@ -595,13 +605,15 @@ function saveTransaction() {
 
 function transactionTemplate(item) {
   const category = findCategory(item.type, item.categoryId);
+  const group = item.type === "expense" ? findTransactionCluster(item) : null;
   const sign = item.type === "expense" ? "-" : "+";
   const amountClass = item.type === "expense" ? "amount-negative" : "amount-positive";
+  const details = [item.time, group?.name, item.note].filter(Boolean).map(escapeHtml).join(" - ");
   return `
     <article class="transaction-item ${transactionEditMode ? "editable" : ""}" ${transactionEditMode ? `data-transaction-action="open" data-transaction="${item.id}"` : ""}>
       <div>
         <strong>${category?.name || "Uncategorized"}</strong>
-        <small>${item.time}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+        <small>${details}</small>
       </div>
       <strong class="${amountClass}">${sign}${formatMoney(item.amount)}</strong>
     </article>
@@ -848,6 +860,28 @@ function exportAssetsCsv() {
 
 function exportBackup() {
   downloadFile(`finance-backup-${currentMonth}.json`, JSON.stringify(state, null, 2), "application/json");
+}
+
+function saveFeedback() {
+  localStorage.setItem(FEEDBACK_STORAGE_KEY, els.feedbackNotes.value);
+}
+
+function clearFeedback() {
+  if (!confirm("Clear all feedback notes?")) return;
+  els.feedbackNotes.value = "";
+  localStorage.removeItem(FEEDBACK_STORAGE_KEY);
+}
+
+function exportFeedback() {
+  saveFeedback();
+  const timestamp = new Date().toISOString().slice(0, 10);
+  const content = [
+    "Finance Tracker Test Feedback",
+    `Export date: ${timestamp}`,
+    "",
+    els.feedbackNotes.value || "(No feedback notes yet.)"
+  ].join("\n");
+  downloadFile(`finance-tracker-feedback-${timestamp}.txt`, content, "text/plain");
 }
 
 function importBackup(event) {
