@@ -1,0 +1,278 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#10bfa8" />
+    <title>PHP Finance Tracker</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Personal tracker</p>
+          <h1 id="screen-title">Summary</h1>
+        </div>
+      </header>
+
+      <main>
+        <section class="screen active" id="summary-screen" aria-labelledby="summary-tab">
+          <div class="metric-grid">
+            <article>
+              <span>Income</span>
+              <strong id="home-income">PHP 0.00</strong>
+            </article>
+            <article>
+              <span>Expenses</span>
+              <strong id="home-expenses">PHP 0.00</strong>
+            </article>
+            <article>
+              <button class="metric-button" id="open-history" type="button">
+                <span>History</span>
+                <strong>View year</strong>
+              </button>
+            </article>
+          </div>
+
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Budget</h2>
+              <div class="calendar-controls">
+                <button class="calendar-nav" id="summary-cluster-prev" type="button" aria-label="Previous budget group">&lt;</button>
+                <button class="calendar-month-button" id="summary-cluster-name" type="button"></button>
+                <button class="calendar-nav" id="summary-cluster-next" type="button" aria-label="Next budget group">&gt;</button>
+              </div>
+            </div>
+            <div class="budget-cluster-summary">
+              <span id="summary-cluster-spent">Spent PHP 0.00</span>
+            </div>
+            <div class="home-budget-bars" id="home-budget-bars"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Calendar view</h2>
+              <div class="calendar-controls">
+                <button class="calendar-nav" id="month-prev" type="button" aria-label="Previous month">&lt;</button>
+                <button class="calendar-month-button" id="month-label" type="button"></button>
+                <button class="calendar-nav" id="month-next" type="button" aria-label="Next month">&gt;</button>
+              </div>
+            </div>
+            <div class="calendar" id="calendar-grid"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <h2 id="selected-date-title">Selected date</h2>
+              <div class="inline-actions">
+                <span id="selected-date-total">PHP 0.00</span>
+                <button class="text-button" id="toggle-transaction-edit" type="button">Edit</button>
+              </div>
+            </div>
+            <div class="list" id="selected-date-list"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="history-screen">
+          <section class="panel">
+            <div class="section-heading">
+              <h2>History</h2>
+              <button class="text-button" id="back-summary" type="button">Back</button>
+            </div>
+            <div class="history-year-controls">
+              <button class="calendar-nav" id="history-prev" type="button" aria-label="Previous year">&lt;</button>
+              <strong id="history-year">2026</strong>
+              <button class="calendar-nav" id="history-next" type="button" aria-label="Next year">&gt;</button>
+            </div>
+          </section>
+
+          <div class="metric-grid">
+            <article>
+              <span>Budgeted</span>
+              <strong id="history-budgeted">PHP 0.00</strong>
+            </article>
+            <article>
+              <span>Spent</span>
+              <strong id="history-spent">PHP 0.00</strong>
+            </article>
+            <article>
+              <span>Difference</span>
+              <strong id="history-difference">PHP 0.00</strong>
+            </article>
+          </div>
+
+          <section class="panel">
+            <div class="history-list" id="history-list"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="add-screen" aria-labelledby="add-tab">
+          <form class="entry-form" id="transaction-form">
+            <div class="segmented" role="tablist" aria-label="Transaction type">
+              <button class="active" type="button" data-type="expense">Expense</button>
+              <button type="button" data-type="income">Income</button>
+            </div>
+
+            <label class="amount-field">
+              <span id="amount-prefix">-</span>
+              <input id="amount" inputmode="decimal" autocomplete="off" placeholder="0" required />
+            </label>
+
+            <label class="entry-cluster-row" id="entry-cluster-row">
+              <span>Budget group</span>
+              <select id="entry-cluster"></select>
+            </label>
+
+            <div class="chips" id="category-chips"></div>
+
+            <label class="field">
+              <span>Note</span>
+              <input id="note" autocomplete="off" placeholder="Tap add note" />
+            </label>
+
+            <div class="date-row">
+              <label>
+                <span>Date</span>
+                <input id="date" type="date" required />
+              </label>
+              <label>
+                <span>Time</span>
+                <input id="time" type="time" required />
+              </label>
+            </div>
+
+            <button class="primary-button" type="submit">Save</button>
+          </form>
+        </section>
+
+        <section class="screen" id="budget-screen" aria-labelledby="budget-tab">
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Monthly budget</h2>
+              <div class="inline-actions">
+                <button class="text-button" id="toggle-category-edit" type="button">Edit categories</button>
+              </div>
+            </div>
+            <div class="cluster-editor-heading">
+              <button class="calendar-nav" id="budget-cluster-prev" type="button" aria-label="Previous budget group">&lt;</button>
+              <strong id="budget-cluster-name">Personal</strong>
+              <button class="calendar-nav" id="budget-cluster-next" type="button" aria-label="Next budget group">&gt;</button>
+            </div>
+            <div class="budget-cluster-summary">
+              <span id="budget-cluster-spent">Spent PHP 0.00</span>
+              <strong id="budget-cluster-remaining">Remaining PHP 0.00</strong>
+            </div>
+            <div class="budget-actions hidden" id="cluster-actions">
+              <button class="small-action-button" id="rename-cluster" type="button">Rename group</button>
+              <button class="small-action-button" id="add-cluster" type="button">Add group</button>
+              <button class="small-action-button danger" id="remove-cluster" type="button">Remove group</button>
+              <button class="small-action-button" id="add-category" type="button">Add category</button>
+            </div>
+          </section>
+          <div class="budget-list" id="budget-list"></div>
+        </section>
+
+        <section class="screen" id="assets-screen" aria-labelledby="assets-tab">
+          <section class="panel">
+            <div class="section-heading">
+              <h2 id="asset-title">Asset tracker</h2>
+              <button class="text-button" id="toggle-assets-edit" type="button">Edit</button>
+            </div>
+            <button class="secondary-button hidden" id="add-asset" type="button">Add asset</button>
+            <div class="asset-summary">
+              <span>Total balance</span>
+              <strong id="asset-total">PHP 0.00</strong>
+            </div>
+            <div id="assets-list" class="asset-list"></div>
+          </section>
+        </section>
+
+        <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
+          <section class="export-grid">
+            <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
+            <button class="export-tile export-wide" id="export-assets-csv" type="button">Export assets CSV</button>
+            <label class="export-tile file-button">
+              Import backup JSON
+              <input id="import-backup" type="file" accept="application/json" />
+            </label>
+            <button class="export-tile" id="export-backup" type="button">Export backup JSON</button>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
+              <h2>Test feedback</h2>
+              <button class="text-button" id="export-feedback" type="button">Export TXT</button>
+            </div>
+            <label class="feedback-field">
+              <span>Notes for app improvements</span>
+              <textarea id="feedback-notes" placeholder="Write what felt confusing, slow, missing, or useful during your test run."></textarea>
+            </label>
+            <div class="feedback-actions">
+              <button class="small-action-button" id="save-feedback" type="button">Save feedback</button>
+              <button class="small-action-button danger" id="clear-feedback" type="button">Clear</button>
+            </div>
+          </section>
+
+        </section>
+      </main>
+
+      <nav class="bottom-nav" aria-label="Main">
+        <button class="active" id="summary-tab" type="button" data-screen="summary-screen">S<span>Summary</span></button>
+        <button id="budget-tab" type="button" data-screen="budget-screen">B<span>Budget</span></button>
+        <button class="add-tab" id="add-tab" type="button" data-screen="add-screen">+<span>Add</span></button>
+        <button id="assets-tab" type="button" data-screen="assets-screen">A<span>Assets</span></button>
+        <button id="settings-tab" type="button" data-screen="settings-screen">⚙<span>Settings</span></button>
+      </nav>
+    </div>
+
+    <div class="modal-backdrop hidden" id="transaction-modal" role="dialog" aria-modal="true" aria-labelledby="transaction-modal-title">
+      <form class="modal-card" id="transaction-edit-form">
+        <div class="section-heading">
+          <h2 id="transaction-modal-title">Edit transaction</h2>
+          <button class="text-button" id="close-transaction-modal" type="button">Cancel</button>
+        </div>
+
+        <div class="transaction-edit-grid">
+          <label>
+            <span>Type</span>
+            <select id="edit-transaction-type"></select>
+          </label>
+          <label>
+            <span>Category</span>
+            <select id="edit-transaction-category"></select>
+          </label>
+          <label class="modal-cluster-row" id="edit-transaction-cluster-row">
+            <span>Budget group</span>
+            <select id="edit-transaction-cluster"></select>
+          </label>
+          <label>
+            <span>Amount</span>
+            <div class="transaction-amount-input">
+              <strong id="edit-transaction-prefix">- PHP</strong>
+              <input id="edit-transaction-amount" inputmode="decimal" required />
+            </div>
+          </label>
+          <label>
+            <span>Time</span>
+            <input id="edit-transaction-time" type="time" required />
+          </label>
+          <label>
+            <span>Date</span>
+            <input id="edit-transaction-date" type="date" required />
+          </label>
+          <label>
+            <span>Note</span>
+            <input id="edit-transaction-note" />
+          </label>
+        </div>
+
+        <button class="primary-button" type="submit">Save changes</button>
+        <button class="delete-transaction-button" id="delete-transaction" type="button">Delete transaction</button>
+      </form>
+    </div>
+
+    <script src="app.js"></script>
+  </body>
+</html>
