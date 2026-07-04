@@ -1160,7 +1160,7 @@ function normalizeState(input) {
   Object.values(budgets).forEach((budget) => migrateBudget(budget, categories));
   return {
     categories,
-    transactions: normalizeTransactions(input.transactions),
+    transactions: normalizeTransactions(input.transactions, budgets, categories),
     budgets,
     goals: input.goals || structuredClone(DEFAULT_GOALS),
     creditCards: normalizeCreditCards(input.creditCards),
@@ -1191,7 +1191,7 @@ function normalizeCategories(categories) {
   return normalized;
 }
 
-function normalizeTransactions(transactions) {
+function normalizeTransactions(transactions, budgets = {}, categories = DEFAULT_CATEGORIES) {
   if (!Array.isArray(transactions)) return [];
   return transactions.map((transaction, index) => {
     const fallbackId = `transaction-${index}-${transaction.createdAt || ""}-${transaction.date || ""}-${transaction.time || ""}-${transaction.amount || 0}`;
@@ -1202,7 +1202,7 @@ function normalizeTransactions(transactions) {
       paymentMethod: normalizePaymentMethod(transaction)
     };
     if (normalized.type === "expense" && !normalized.clusterId) {
-      normalized.clusterId = inferTransactionClusterId(normalized);
+      normalized.clusterId = inferTransactionClusterId(normalized, budgets, categories);
     }
     return normalized;
   });
@@ -1214,7 +1214,7 @@ function normalizePaymentMethod(transaction) {
   return PAYMENT_METHODS.includes(transaction.paymentMethod) ? transaction.paymentMethod : PAYMENT_METHODS[0];
 }
 
-function migrateBudget(budget, categoriesSource = state?.categories || DEFAULT_CATEGORIES) {
+function migrateBudget(budget, categoriesSource = DEFAULT_CATEGORIES) {
   if (!budget) return;
   if (Array.isArray(budget.clusters) && budget.clusters.length) {
     budget.clusters.forEach((cluster, index) => {
@@ -1246,8 +1246,8 @@ function migrateBudget(budget, categoriesSource = state?.categories || DEFAULT_C
   delete budget.total;
 }
 
-function getBudgetClusters(budget) {
-  migrateBudget(budget);
+function getBudgetClusters(budget, categoriesSource = DEFAULT_CATEGORIES) {
+  migrateBudget(budget, categoriesSource);
   return budget.clusters;
 }
 
@@ -1287,12 +1287,13 @@ function getTransactionClusterId(transaction) {
   return inferTransactionClusterId(transaction);
 }
 
-function inferTransactionClusterId(transaction) {
+function inferTransactionClusterId(transaction, budgets = state.budgets, categories = state.categories) {
   const monthKey = transaction.date?.slice(0, 7) || currentMonth;
-  const budget = state.budgets[monthKey] || state.budgets[currentMonth];
+  const budget = budgets[monthKey] || budgets[currentMonth];
   if (!budget) return "";
-  const match = getBudgetClusters(budget).find((cluster) => getClusterCategoryIds(cluster).includes(transaction.categoryId));
-  return match?.id || getBudgetClusters(budget)[0]?.id || "";
+  const clusters = getBudgetClusters(budget, categories);
+  const match = clusters.find((cluster) => getClusterCategoryIds(cluster).includes(transaction.categoryId));
+  return match?.id || clusters[0]?.id || "";
 }
 
 function findTransactionCluster(transaction) {
@@ -1319,9 +1320,9 @@ function findCategory(type, id) {
 function parseAmount(value) {
   const cleaned = String(value).replace(/,/g, "").trim();
   if (!cleaned) return 0;
-  if (/^[\d\s.+\-*/()xX÷]+$/.test(cleaned) && /[+\-*/xX÷()]/.test(cleaned)) {
+  if (/^[\d\s.+\-*/()xX]+$/.test(cleaned) && /[+\-*/xX()]/.test(cleaned)) {
     try {
-      const expression = cleaned.replace(/[xX÷]/g, (operator) => (operator === "÷" ? "/" : "*"));
+      const expression = cleaned.replace(/[xX]/g, "*");
       const result = Function(`"use strict"; return (${expression});`)();
       return Number.isFinite(result) ? Math.abs(result) : 0;
     } catch {
