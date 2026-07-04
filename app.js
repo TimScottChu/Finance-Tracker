@@ -43,7 +43,11 @@ const DEFAULT_ASSETS = [
   { id: "bpi-uitf", date: "2026-03-09", account: "BPI UITF", balance: 2108519.19 }
 ];
 
-const PAYMENT_METHODS = ["Cash", "Credit Card", "Digital Wallet"];
+const CREDIT_CARD_METHODS = [
+  { id: "bpi", name: "BPI", method: "Credit Card - BPI", cutoffDay: 25 },
+  { id: "metro", name: "Metro", method: "Credit Card - Metro", cutoffDay: 25 }
+];
+const PAYMENT_METHODS = ["Cash", ...CREDIT_CARD_METHODS.map((card) => card.method), "Digital Wallet"];
 
 let state = loadState();
 let currentMonth = getMonthKey(new Date());
@@ -55,6 +59,7 @@ let assetsEditMode = false;
 let categoryEditMode = false;
 let transactionEditMode = false;
 let editingTransactionId = "";
+let selectedCardDetailId = "";
 let activeClusterIndex = 0;
 let selectedEntryClusterId = "";
 let selectedPaymentMethod = PAYMENT_METHODS[0];
@@ -109,6 +114,13 @@ const els = {
   transactionModal: document.querySelector("#transaction-modal"),
   transactionEditForm: document.querySelector("#transaction-edit-form"),
   closeTransactionModal: document.querySelector("#close-transaction-modal"),
+  cardDetailModal: document.querySelector("#card-detail-modal"),
+  closeCardDetail: document.querySelector("#close-card-detail"),
+  cardDetailTitle: document.querySelector("#card-detail-title"),
+  cardCutoffDay: document.querySelector("#card-cutoff-day"),
+  cardDetailPeriod: document.querySelector("#card-detail-period"),
+  cardDetailTotal: document.querySelector("#card-detail-total"),
+  cardDetailList: document.querySelector("#card-detail-list"),
   editTransactionType: document.querySelector("#edit-transaction-type"),
   editTransactionCategory: document.querySelector("#edit-transaction-category"),
   editTransactionClusterRow: document.querySelector("#edit-transaction-cluster-row"),
@@ -201,6 +213,23 @@ function bindEvents() {
   els.closeTransactionModal.addEventListener("click", closeTransactionModal);
   els.transactionModal.addEventListener("click", (event) => {
     if (event.target === els.transactionModal) closeTransactionModal();
+  });
+  els.paymentMethodList.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-card-detail]");
+    if (!button) return;
+    openCardDetail(button.dataset.cardDetail);
+  });
+  els.closeCardDetail.addEventListener("click", closeCardDetail);
+  els.cardDetailModal.addEventListener("click", (event) => {
+    if (event.target === els.cardDetailModal) closeCardDetail();
+  });
+  els.cardCutoffDay.addEventListener("change", () => {
+    const card = getCreditCardSetting(selectedCardDetailId);
+    if (!card) return;
+    card.cutoffDay = clampCutoffDay(Number(els.cardCutoffDay.value));
+    persist();
+    renderPaymentMethodTotals();
+    renderCardDetail();
   });
   els.editTransactionType.addEventListener("change", () => {
     populateEditClusters(els.editTransactionDate.value);
@@ -446,13 +475,60 @@ function getEntryCategories() {
 }
 
 function renderPaymentMethodTotals() {
-  const totals = getPaymentMethodTotals(currentMonth);
-  els.paymentMethodList.innerHTML = PAYMENT_METHODS.map((method) => `
-    <article class="payment-method-row ${method === "Credit Card" ? "highlight" : ""}">
-      <span>${method}</span>
-      <strong>${formatMoney(totals[method] || 0)}</strong>
-    </article>
-  `).join("");
+  els.paymentMethodList.innerHTML = state.creditCards
+    .map((card) => {
+      const period = getStatementPeriod(currentMonth, card.cutoffDay);
+      const total = getCreditCardTransactions(card.id, currentMonth).reduce((sum, item) => sum + item.amount, 0);
+      return `
+        <button class="payment-method-row highlight" type="button" data-card-detail="${card.id}">
+          <span>
+            <strong>${escapeHtml(card.name)}</strong>
+            <small>${formatShortDate(period.start)} - ${formatShortDate(period.end)}</small>
+          </span>
+          <strong>${formatMoney(total)}</strong>
+        </button>
+      `;
+    })
+    .join("");
+}
+
+function openCardDetail(cardId) {
+  selectedCardDetailId = cardId;
+  renderCardDetail();
+  els.cardDetailModal.classList.remove("hidden");
+}
+
+function closeCardDetail() {
+  selectedCardDetailId = "";
+  els.cardDetailModal.classList.add("hidden");
+}
+
+function renderCardDetail() {
+  const card = getCreditCardSetting(selectedCardDetailId);
+  if (!card) return;
+  const period = getStatementPeriod(currentMonth, card.cutoffDay);
+  const transactions = getCreditCardTransactions(card.id, currentMonth);
+  const total = transactions.reduce((sum, item) => sum + item.amount, 0);
+  els.cardDetailTitle.textContent = `${card.name} transactions`;
+  els.cardCutoffDay.value = card.cutoffDay;
+  els.cardDetailPeriod.textContent = `${formatDisplayDate(period.start)} - ${formatDisplayDate(period.end)}`;
+  els.cardDetailTotal.textContent = formatMoney(total);
+  els.cardDetailList.innerHTML = transactions.length
+    ? transactions
+        .map((item) => {
+          const category = findCategory(item.type, item.categoryId);
+          return `
+            <article class="transaction-item">
+              <div>
+                <strong>${category?.name || "Uncategorized"}</strong>
+                <small>${formatDisplayDate(item.date)} - ${item.time}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+              </div>
+              <strong class="amount-negative">-${formatMoney(item.amount)}</strong>
+            </article>
+          `;
+        })
+        .join("")
+    : `<p class="empty">No credit card transactions in this statement period.</p>`;
 }
 
 function renderBudget() {
@@ -982,6 +1058,39 @@ function getPaymentMethodTotals(monthKey) {
     }, Object.fromEntries(PAYMENT_METHODS.map((method) => [method, 0])));
 }
 
+function getCreditCardTransactions(cardId, monthKey) {
+  const card = getCreditCardSetting(cardId);
+  if (!card) return [];
+  const period = getStatementPeriod(monthKey, card.cutoffDay);
+  return state.transactions
+    .filter((item) => item.type === "expense" && item.paymentMethod === card.method && item.date >= period.start && item.date <= period.end)
+    .sort((a, b) => `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`));
+}
+
+function getCreditCardSetting(cardId) {
+  return state.creditCards.find((card) => card.id === cardId);
+}
+
+function getStatementPeriod(monthKey, cutoffDay) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const end = new Date(year, month - 1, Math.min(cutoffDay, daysInMonth(year, month)));
+  const previousMonthDate = new Date(year, month - 2, 1);
+  const previousYear = previousMonthDate.getFullYear();
+  const previousMonth = previousMonthDate.getMonth() + 1;
+  const previousCutoff = new Date(previousYear, previousMonth - 1, Math.min(cutoffDay, daysInMonth(previousYear, previousMonth)));
+  const start = new Date(previousCutoff);
+  start.setDate(start.getDate() + 1);
+  return { start: toDateInputValue(start), end: toDateInputValue(end) };
+}
+
+function daysInMonth(year, month) {
+  return new Date(year, month, 0).getDate();
+}
+
+function clampCutoffDay(value) {
+  return Math.min(31, Math.max(1, Number(value) || 1));
+}
+
 function getCategorySpent(monthKey, categoryId, clusterId = "") {
   return state.transactions
     .filter((item) => {
@@ -1054,9 +1163,21 @@ function normalizeState(input) {
     transactions: normalizeTransactions(input.transactions),
     budgets,
     goals: input.goals || structuredClone(DEFAULT_GOALS),
+    creditCards: normalizeCreditCards(input.creditCards),
     assets: Array.isArray(input.assets) ? input.assets : structuredClone(DEFAULT_ASSETS),
     assetUpdatedAt: input.assetUpdatedAt || latestDateFromAssets(input.assets) || toDateInputValue(new Date())
   };
+}
+
+function normalizeCreditCards(cards) {
+  return CREDIT_CARD_METHODS.map((defaultCard) => {
+    const saved = Array.isArray(cards) ? cards.find((card) => card.id === defaultCard.id) : null;
+    return {
+      ...defaultCard,
+      name: saved?.name || defaultCard.name,
+      cutoffDay: clampCutoffDay(saved?.cutoffDay || defaultCard.cutoffDay)
+    };
+  });
 }
 
 function normalizeCategories(categories) {
@@ -1078,13 +1199,19 @@ function normalizeTransactions(transactions) {
       ...transaction,
       id: transaction.id || slugify(fallbackId) || crypto.randomUUID(),
       categoryId: transaction.categoryId === "utilities" ? "living-costs" : transaction.categoryId,
-      paymentMethod: transaction.type === "expense" ? transaction.paymentMethod || PAYMENT_METHODS[0] : ""
+      paymentMethod: normalizePaymentMethod(transaction)
     };
     if (normalized.type === "expense" && !normalized.clusterId) {
       normalized.clusterId = inferTransactionClusterId(normalized);
     }
     return normalized;
   });
+}
+
+function normalizePaymentMethod(transaction) {
+  if (transaction.type !== "expense") return "";
+  if (transaction.paymentMethod === "Credit Card") return CREDIT_CARD_METHODS[0].method;
+  return PAYMENT_METHODS.includes(transaction.paymentMethod) ? transaction.paymentMethod : PAYMENT_METHODS[0];
 }
 
 function migrateBudget(budget, categoriesSource = state?.categories || DEFAULT_CATEGORIES) {
@@ -1246,6 +1373,11 @@ function monthLong(monthKey) {
 function formatDisplayDate(value) {
   const date = new Date(`${value}T00:00:00`);
   return date.toLocaleDateString("en-PH", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function formatShortDate(value) {
+  const date = new Date(`${value}T00:00:00`);
+  return date.toLocaleDateString("en-PH", { day: "numeric", month: "short" });
 }
 
 function latestAssetDate() {

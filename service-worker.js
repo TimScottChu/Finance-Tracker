@@ -1,4 +1,4 @@
-const CACHE_NAME = "php-finance-tracker-v5";
+const CACHE_NAME = "php-finance-tracker-v6";
 const APP_SHELL = [
   "./",
   "./index.html",

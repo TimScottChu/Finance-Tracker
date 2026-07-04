@@ -180,9 +180,13 @@ main {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
   gap: 12px;
+  border: 0;
   border-bottom: 1px solid var(--line);
   padding: 8px 0;
+  background: transparent;
+  text-align: left;
 }
 
 .payment-method-row:last-child {
@@ -190,9 +194,21 @@ main {
 }
 
 .payment-method-row span {
+  display: grid;
+  gap: 2px;
   color: var(--muted);
   font-size: 13px;
   font-weight: 800;
+}
+
+.payment-method-row span strong {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.payment-method-row small {
+  color: var(--muted);
+  font-size: 12px;
 }
 
 .payment-method-row strong {
@@ -201,6 +217,27 @@ main {
 
 .payment-method-row.highlight strong {
   color: var(--mint-dark);
+}
+
+.card-detail-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 12px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+}
+
+.card-detail-summary span {
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.card-detail-summary strong {
+  font-size: 18px;
 }
 
 .history-year-controls {
