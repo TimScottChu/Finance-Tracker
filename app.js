@@ -43,6 +43,8 @@ const DEFAULT_ASSETS = [
   { id: "bpi-uitf", date: "2026-03-09", account: "BPI UITF", balance: 2108519.19 }
 ];
 
+const PAYMENT_METHODS = ["Cash", "Credit Card", "Digital Wallet"];
+
 let state = loadState();
 let currentMonth = getMonthKey(new Date());
 let selectedDate = toDateInputValue(new Date());
@@ -55,6 +57,7 @@ let transactionEditMode = false;
 let editingTransactionId = "";
 let activeClusterIndex = 0;
 let selectedEntryClusterId = "";
+let selectedPaymentMethod = PAYMENT_METHODS[0];
 
 const peso = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -77,6 +80,8 @@ const els = {
   time: document.querySelector("#time"),
   entryClusterRow: document.querySelector("#entry-cluster-row"),
   entryCluster: document.querySelector("#entry-cluster"),
+  entryPaymentRow: document.querySelector("#entry-payment-row"),
+  entryPaymentMethod: document.querySelector("#entry-payment-method"),
   categoryChips: document.querySelector("#category-chips"),
   typeButtons: document.querySelectorAll(".segmented button"),
   homeIncome: document.querySelector("#home-income"),
@@ -107,6 +112,8 @@ const els = {
   editTransactionCategory: document.querySelector("#edit-transaction-category"),
   editTransactionClusterRow: document.querySelector("#edit-transaction-cluster-row"),
   editTransactionCluster: document.querySelector("#edit-transaction-cluster"),
+  editTransactionPaymentRow: document.querySelector("#edit-transaction-payment-row"),
+  editTransactionPaymentMethod: document.querySelector("#edit-transaction-payment-method"),
   editTransactionPrefix: document.querySelector("#edit-transaction-prefix"),
   editTransactionAmount: document.querySelector("#edit-transaction-amount"),
   editTransactionTime: document.querySelector("#edit-transaction-time"),
@@ -197,6 +204,7 @@ function bindEvents() {
   els.editTransactionType.addEventListener("change", () => {
     populateEditClusters(els.editTransactionDate.value);
     populateEditCategories(els.editTransactionType.value, els.editTransactionCluster.value, els.editTransactionDate.value);
+    populatePaymentMethods(els.editTransactionPaymentMethod, els.editTransactionPaymentRow, els.editTransactionType.value === "expense");
     els.editTransactionPrefix.textContent = els.editTransactionType.value === "expense" ? "- PHP" : "+ PHP";
   });
   els.editTransactionCluster.addEventListener("change", () => {
@@ -205,6 +213,7 @@ function bindEvents() {
   els.editTransactionDate.addEventListener("change", () => {
     populateEditClusters(els.editTransactionDate.value);
     populateEditCategories(els.editTransactionType.value, els.editTransactionCluster.value, els.editTransactionDate.value);
+    populatePaymentMethods(els.editTransactionPaymentMethod, els.editTransactionPaymentRow, els.editTransactionType.value === "expense", els.editTransactionPaymentMethod.value);
   });
   els.deleteTransaction.addEventListener("click", deleteEditingTransaction);
 
@@ -219,6 +228,9 @@ function bindEvents() {
     selectedEntryClusterId = els.entryCluster.value;
     selectedCategory = getEntryCategories()[0]?.id || "";
     renderEntry();
+  });
+  els.entryPaymentMethod.addEventListener("change", () => {
+    selectedPaymentMethod = els.entryPaymentMethod.value;
   });
 
   els.form.addEventListener("submit", (event) => {
@@ -382,6 +394,7 @@ function renderEntry() {
   els.amountPrefix.textContent = entryType === "expense" ? "-" : "+";
   els.amountPrefix.parentElement.style.color = entryType === "expense" ? "var(--pink)" : "var(--mint-dark)";
   renderEntryClusterSelector();
+  populatePaymentMethods(els.entryPaymentMethod, els.entryPaymentRow, entryType === "expense", selectedPaymentMethod);
   const categories = getEntryCategories();
   if (!categories.some((category) => category.id === selectedCategory)) {
     selectedCategory = categories[0]?.id || "";
@@ -413,6 +426,13 @@ function renderEntryClusterSelector() {
   els.entryCluster.innerHTML = clusters
     .map((cluster) => `<option value="${cluster.id}" ${cluster.id === selectedEntryClusterId ? "selected" : ""}>${cluster.name}</option>`)
     .join("");
+}
+
+function populatePaymentMethods(select, row, visible, selected = PAYMENT_METHODS[0]) {
+  row.classList.toggle("hidden", !visible);
+  if (!visible) return;
+  const active = PAYMENT_METHODS.includes(selected) ? selected : PAYMENT_METHODS[0];
+  select.innerHTML = PAYMENT_METHODS.map((method) => `<option value="${method}" ${method === active ? "selected" : ""}>${method}</option>`).join("");
 }
 
 function getEntryCategories() {
@@ -522,7 +542,9 @@ function renderHistory() {
   els.historyDifference.textContent = formatMoney(totalDifference);
   els.historyDifference.className = totalDifference < 0 ? "amount-negative" : "";
   els.historyList.innerHTML = monthRows
-    .map((row) => `
+    .map((row) => {
+      const overspent = getMonthOverspending(row.monthKey);
+      return `
       <article class="history-row">
         <strong>${row.monthName}</strong>
         <span>Budgeted ${formatMoney(row.budgeted)}</span>
@@ -530,8 +552,17 @@ function renderHistory() {
         <span class="${row.difference < 0 ? "amount-negative" : ""}">
           ${row.difference < 0 ? "Over " : "Left "}${formatMoney(Math.abs(row.difference))}
         </span>
+        ${
+          overspent.length
+            ? `<div class="history-insight">
+                <strong>Overspent</strong>
+                ${overspent.slice(0, 3).map((item) => `<span>${escapeHtml(item.name)} +${formatMoney(item.amount)}</span>`).join("")}
+              </div>`
+            : ""
+        }
       </article>
-    `)
+    `;
+    })
     .join("");
 }
 
@@ -589,6 +620,7 @@ function saveTransaction() {
     amount,
     categoryId: selectedCategory,
     clusterId: entryType === "expense" ? selectedEntryClusterId : "",
+    paymentMethod: entryType === "expense" ? selectedPaymentMethod : "",
     note: normalizeTextInput(els.note.value),
     date: els.date.value,
     time: els.time.value,
@@ -610,7 +642,7 @@ function transactionTemplate(item) {
   const group = item.type === "expense" ? findTransactionCluster(item) : null;
   const sign = item.type === "expense" ? "-" : "+";
   const amountClass = item.type === "expense" ? "amount-negative" : "amount-positive";
-  const details = [item.time, group?.name, item.note].filter(Boolean).map(escapeHtml).join(" - ");
+  const details = [item.time, group?.name, item.type === "expense" ? item.paymentMethod : "", item.note].filter(Boolean).map(escapeHtml).join(" - ");
   return `
     <article class="transaction-item ${transactionEditMode ? "editable" : ""}" ${transactionEditMode ? `data-transaction-action="open" data-transaction="${item.id}"` : ""}>
       <div>
@@ -644,6 +676,7 @@ function openTransactionModal(transactionId) {
   els.editTransactionType.value = transaction.type;
   populateEditClusters(transaction.date);
   els.editTransactionCluster.value = transaction.type === "expense" ? getTransactionClusterId(transaction) : "";
+  populatePaymentMethods(els.editTransactionPaymentMethod, els.editTransactionPaymentRow, transaction.type === "expense", transaction.paymentMethod);
   populateEditCategories(transaction.type, els.editTransactionCluster.value, transaction.date);
   els.editTransactionCategory.value = transaction.categoryId;
   els.editTransactionPrefix.textContent = transaction.type === "expense" ? "- PHP" : "+ PHP";
@@ -695,6 +728,7 @@ function saveEditedTransaction(event) {
   transaction.type = els.editTransactionType.value;
   transaction.categoryId = els.editTransactionCategory.value;
   transaction.clusterId = transaction.type === "expense" ? els.editTransactionCluster.value : "";
+  transaction.paymentMethod = transaction.type === "expense" ? els.editTransactionPaymentMethod.value : "";
   transaction.amount = parseAmount(els.editTransactionAmount.value);
   transaction.time = els.editTransactionTime.value;
   transaction.date = els.editTransactionDate.value;
@@ -852,11 +886,11 @@ function handleAssetFieldChange(event) {
 }
 
 function exportCsv() {
-  const header = ["Date", "Time", "Type", "Group", "Category", "Amount", "Note"];
+  const header = ["Date", "Time", "Type", "Group", "Category", "Payment Method", "Amount", "Note"];
   const rows = state.transactions.map((item) => {
     const category = findCategory(item.type, item.categoryId);
     const cluster = item.type === "expense" ? findTransactionCluster(item) : null;
-    return [item.date, item.time, item.type, cluster?.name || "", category?.name || "", item.amount, item.note];
+    return [item.date, item.time, item.type, cluster?.name || "", category?.name || "", item.paymentMethod || "", item.amount, item.note];
   });
   downloadFile(`transactions-${currentMonth}.csv`, toCsv([header, ...rows]), "text/csv");
 }
@@ -942,6 +976,25 @@ function getClusterTotals(monthKey, cluster) {
   return { budgeted, spent, remaining: budgeted - spent };
 }
 
+function getMonthOverspending(monthKey) {
+  const budget = state.budgets[monthKey];
+  if (!budget) return [];
+  return getBudgetClusters(budget)
+    .flatMap((cluster) =>
+      getClusterCategoryIds(cluster).map((categoryId) => {
+        const category = findCategory("expense", categoryId);
+        const limit = cluster.categories[categoryId] ?? 0;
+        const spent = getCategorySpent(monthKey, categoryId, cluster.id);
+        return {
+          name: `${category?.name || "Uncategorized"} (${cluster.name})`,
+          amount: spent - limit
+        };
+      })
+    )
+    .filter((item) => item.amount > 0)
+    .sort((a, b) => b.amount - a.amount);
+}
+
 function ensureMonthBudget(monthKey) {
   if (state.budgets[monthKey]) {
     migrateBudget(state.budgets[monthKey]);
@@ -1002,7 +1055,8 @@ function normalizeTransactions(transactions) {
     const normalized = {
       ...transaction,
       id: transaction.id || slugify(fallbackId) || crypto.randomUUID(),
-      categoryId: transaction.categoryId === "utilities" ? "living-costs" : transaction.categoryId
+      categoryId: transaction.categoryId === "utilities" ? "living-costs" : transaction.categoryId,
+      paymentMethod: transaction.type === "expense" ? transaction.paymentMethod || PAYMENT_METHODS[0] : ""
     };
     if (normalized.type === "expense" && !normalized.clusterId) {
       normalized.clusterId = inferTransactionClusterId(normalized);
@@ -1114,7 +1168,18 @@ function findCategory(type, id) {
 }
 
 function parseAmount(value) {
-  return Number(String(value).replace(/,/g, "")) || 0;
+  const cleaned = String(value).replace(/,/g, "").trim();
+  if (!cleaned) return 0;
+  if (/^[\d\s.+\-*/()xX÷]+$/.test(cleaned) && /[+\-*/xX÷()]/.test(cleaned)) {
+    try {
+      const expression = cleaned.replace(/[xX÷]/g, (operator) => (operator === "÷" ? "/" : "*"));
+      const result = Function(`"use strict"; return (${expression});`)();
+      return Number.isFinite(result) ? Math.abs(result) : 0;
+    } catch {
+      return 0;
+    }
+  }
+  return Number(cleaned) || 0;
 }
 
 function formatMoney(value) {
