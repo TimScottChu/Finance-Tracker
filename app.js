@@ -60,6 +60,8 @@ let categoryEditMode = false;
 let transactionEditMode = false;
 let editingTransactionId = "";
 let selectedCardDetailId = "";
+let summaryValuesVisible = true;
+let expandedSummaryCategoryId = "";
 let activeClusterIndex = 0;
 let selectedEntryClusterId = "";
 let selectedPaymentMethod = PAYMENT_METHODS[0];
@@ -89,6 +91,7 @@ const els = {
   entryPaymentMethod: document.querySelector("#entry-payment-method"),
   categoryChips: document.querySelector("#category-chips"),
   typeButtons: document.querySelectorAll(".segmented button"),
+  privacyToggles: document.querySelectorAll("[data-privacy-toggle]"),
   homeIncome: document.querySelector("#home-income"),
   homeExpenses: document.querySelector("#home-expenses"),
   openHistory: document.querySelector("#open-history"),
@@ -194,6 +197,18 @@ function bindEvents() {
   els.historyNext.addEventListener("click", () => {
     historyYear += 1;
     renderHistory();
+  });
+  els.privacyToggles.forEach((button) => {
+    button.addEventListener("click", () => {
+      summaryValuesVisible = !summaryValuesVisible;
+      renderHome();
+    });
+  });
+  els.homeBudgetBars.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-summary-category]");
+    if (!row) return;
+    expandedSummaryCategoryId = expandedSummaryCategoryId === row.dataset.summaryCategory ? "" : row.dataset.summaryCategory;
+    renderHomeBudgetBars();
   });
   els.calendarGrid.addEventListener("click", (event) => {
     const button = event.target.closest("[data-date]");
@@ -316,6 +331,7 @@ function changeMonth(offset) {
 function changeCluster(offset) {
   const clusters = getBudgetClusters(state.budgets[currentMonth]);
   activeClusterIndex = (activeClusterIndex + offset + clusters.length) % clusters.length;
+  expandedSummaryCategoryId = "";
   selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
   renderHomeBudgetBars();
   renderEntry();
@@ -334,8 +350,12 @@ function render() {
 
 function renderHome() {
   const totals = getMonthTotals(currentMonth);
-  els.homeIncome.textContent = formatMoney(totals.income);
-  els.homeExpenses.textContent = formatMoney(totals.expense);
+  els.homeIncome.textContent = formatPrivateMoney(totals.income);
+  els.homeExpenses.textContent = formatPrivateMoney(totals.expense);
+  els.privacyToggles.forEach((button) => {
+    button.classList.toggle("hidden-values", !summaryValuesVisible);
+    button.setAttribute("aria-label", summaryValuesVisible ? "Hide summary values" : "Show summary values");
+  });
   renderHomeBudgetBars();
   renderPaymentMethodTotals();
 
@@ -358,8 +378,9 @@ function renderHomeBudgetBars() {
       const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
       const capped = Math.min(100, Math.max(0, percent));
       const statusClass = getBudgetStatusClass(percent);
+      const isExpanded = expandedSummaryCategoryId === categoryId;
       return `
-        <article class="home-budget-row">
+        <button class="home-budget-row ${isExpanded ? "expanded" : ""}" type="button" data-summary-category="${categoryId}">
           <div class="home-budget-labels">
             <strong>${category?.name || "Uncategorized"}</strong>
             <span class="${remaining < 0 ? "amount-negative" : ""}">
@@ -369,7 +390,8 @@ function renderHomeBudgetBars() {
           <div class="progress-track compact">
             <div class="progress-fill ${statusClass}" style="--width:${capped}%"></div>
           </div>
-        </article>
+          ${isExpanded ? `<div class="summary-category-total">Month total <strong>${formatMoney(spent)}</strong></div>` : ""}
+        </button>
       `;
     })
     .join("");
@@ -1334,6 +1356,10 @@ function parseAmount(value) {
 
 function formatMoney(value) {
   return peso.format(value);
+}
+
+function formatPrivateMoney(value) {
+  return summaryValuesVisible ? formatMoney(value) : "---";
 }
 
 function compactMoney(value) {
