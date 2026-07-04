@@ -100,6 +100,7 @@ const els = {
   summaryClusterName: document.querySelector("#summary-cluster-name"),
   summaryClusterSpent: document.querySelector("#summary-cluster-spent"),
   homeBudgetBars: document.querySelector("#home-budget-bars"),
+  paymentMethodList: document.querySelector("#payment-method-list"),
   calendarGrid: document.querySelector("#calendar-grid"),
   selectedDateTitle: document.querySelector("#selected-date-title"),
   selectedDateTotal: document.querySelector("#selected-date-total"),
@@ -307,6 +308,7 @@ function renderHome() {
   els.homeIncome.textContent = formatMoney(totals.income);
   els.homeExpenses.textContent = formatMoney(totals.expense);
   renderHomeBudgetBars();
+  renderPaymentMethodTotals();
 
   renderCalendar();
   renderSelectedDateTransactions();
@@ -441,6 +443,16 @@ function getEntryCategories() {
   return getClusterCategoryIds(cluster)
     .map((categoryId) => findCategory("expense", categoryId))
     .filter(Boolean);
+}
+
+function renderPaymentMethodTotals() {
+  const totals = getPaymentMethodTotals(currentMonth);
+  els.paymentMethodList.innerHTML = PAYMENT_METHODS.map((method) => `
+    <article class="payment-method-row ${method === "Credit Card" ? "highlight" : ""}">
+      <span>${method}</span>
+      <strong>${formatMoney(totals[method] || 0)}</strong>
+    </article>
+  `).join("");
 }
 
 function renderBudget() {
@@ -958,6 +970,16 @@ function getMonthTotals(monthKey) {
       },
       { expense: 0, income: 0, saving: 0 }
     );
+}
+
+function getPaymentMethodTotals(monthKey) {
+  return state.transactions
+    .filter((item) => item.type === "expense" && item.date.startsWith(monthKey))
+    .reduce((totals, item) => {
+      const method = PAYMENT_METHODS.includes(item.paymentMethod) ? item.paymentMethod : PAYMENT_METHODS[0];
+      totals[method] += item.amount;
+      return totals;
+    }, Object.fromEntries(PAYMENT_METHODS.map((method) => [method, 0])));
 }
 
 function getCategorySpent(monthKey, categoryId, clusterId = "") {
