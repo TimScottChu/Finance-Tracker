@@ -857,7 +857,7 @@ main {
 
 .asset-header.editing,
 .asset-row.editing {
-  grid-template-columns: 1fr 150px 44px;
+  grid-template-columns: 1fr 144px 96px;
 }
 
 .asset-header {
@@ -882,7 +882,25 @@ main {
 
 .asset-actions {
   display: flex;
+  gap: 6px;
   justify-content: flex-end;
+}
+
+.asset-order-button {
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--mint-dark);
+  background: #fff;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.asset-order-button:disabled {
+  color: var(--muted);
+  opacity: 0.35;
 }
 
 .asset-account-input,

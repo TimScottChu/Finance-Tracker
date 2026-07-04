@@ -314,7 +314,7 @@ function renderHomeBudgetBars() {
       const remaining = limit - spent;
       const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
       const capped = Math.min(100, Math.max(0, percent));
-      const statusClass = percent >= 100 ? "over" : percent >= 80 ? "warning" : "";
+      const statusClass = getBudgetStatusClass(percent);
       return `
         <article class="home-budget-row">
           <div class="home-budget-labels">
@@ -441,7 +441,7 @@ function renderBudget() {
       const remaining = limit - spent;
       const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
       const capped = Math.min(100, Math.max(0, percent));
-      const statusClass = percent >= 100 ? "over" : percent >= 80 ? "warning" : "";
+      const statusClass = getBudgetStatusClass(percent);
       return `
         <article class="budget-card">
           <div class="budget-row ${categoryEditMode ? "editing" : ""}">
@@ -487,7 +487,7 @@ function renderBudget() {
     input.addEventListener("change", () => {
       const category = state.categories.expense.find((item) => item.id === input.dataset.category);
       if (!category) return;
-      category.name = input.value.trim() || category.name;
+      category.name = normalizeTextInput(input.value) || category.name;
       persist();
       render();
     });
@@ -549,7 +549,7 @@ function renderAssets() {
       ${assetsEditMode ? "<span>Actions</span>" : ""}
     </div>
     ${state.assets
-      .map((asset) => `
+      .map((asset, index) => `
         <div class="asset-row ${assetsEditMode ? "editing" : ""}">
           ${
             assetsEditMode
@@ -564,6 +564,8 @@ function renderAssets() {
           ${
             assetsEditMode
               ? `<span class="asset-actions">
+                  <button class="asset-order-button" type="button" data-asset-action="up" data-asset="${asset.id}" aria-label="Move ${escapeAttribute(asset.account)} up" ${index === 0 ? "disabled" : ""}>&uarr;</button>
+                  <button class="asset-order-button" type="button" data-asset-action="down" data-asset="${asset.id}" aria-label="Move ${escapeAttribute(asset.account)} down" ${index === state.assets.length - 1 ? "disabled" : ""}>&darr;</button>
                   <button class="remove-icon-button" type="button" data-asset-action="remove" data-asset="${asset.id}" aria-label="Remove ${escapeAttribute(asset.account)}"></button>
                 </span>`
               : ""
@@ -587,7 +589,7 @@ function saveTransaction() {
     amount,
     categoryId: selectedCategory,
     clusterId: entryType === "expense" ? selectedEntryClusterId : "",
-    note: els.note.value.trim(),
+    note: normalizeTextInput(els.note.value),
     date: els.date.value,
     time: els.time.value,
     createdAt: new Date().toISOString()
@@ -696,7 +698,7 @@ function saveEditedTransaction(event) {
   transaction.amount = parseAmount(els.editTransactionAmount.value);
   transaction.time = els.editTransactionTime.value;
   transaction.date = els.editTransactionDate.value;
-  transaction.note = els.editTransactionNote.value.trim();
+  transaction.note = normalizeTextInput(els.editTransactionNote.value);
 
   selectedDate = transaction.date;
   currentMonth = getMonthKey(new Date(`${selectedDate}T00:00:00`));
@@ -720,8 +722,9 @@ function addCategory() {
   const cluster = getActiveCluster(state.budgets[currentMonth]);
   const name = prompt("Category name");
   if (!name) return;
-  const idBase = slugify(name) || "category";
-  let category = state.categories.expense.find((item) => item.id === idBase || item.name.toLowerCase() === name.trim().toLowerCase());
+  const normalizedName = normalizeTextInput(name);
+  const idBase = slugify(normalizedName) || "category";
+  let category = state.categories.expense.find((item) => item.id === idBase || item.name.toLowerCase() === normalizedName.toLowerCase());
   if (!category) {
     let id = idBase;
     let suffix = 2;
@@ -729,7 +732,7 @@ function addCategory() {
       id = `${idBase}-${suffix}`;
       suffix += 1;
     }
-    category = { id, name: name.trim(), icon: "", budget: 0 };
+    category = { id, name: normalizedName, icon: "", budget: 0 };
     state.categories.expense.push(category);
   }
 
@@ -758,7 +761,7 @@ function renameCluster() {
   const cluster = getActiveCluster(state.budgets[currentMonth]);
   const name = prompt("Group name", cluster.name);
   if (!name) return;
-  cluster.name = name.trim() || cluster.name;
+  cluster.name = normalizeTextInput(name) || cluster.name;
   persist();
   render();
 }
@@ -769,9 +772,10 @@ function addCluster() {
   const source = getActiveCluster(budget);
   const name = prompt("New group name", `${source.name} copy`);
   if (!name) return;
+  const normalizedName = normalizeTextInput(name);
   clusters.push({
-    id: `${slugify(name) || "cluster"}-${Date.now()}`,
-    name: name.trim(),
+    id: `${slugify(normalizedName) || "cluster"}-${Date.now()}`,
+    name: normalizedName,
     categories: structuredClone(source.categories || {})
   });
   activeClusterIndex = clusters.length - 1;
@@ -798,10 +802,11 @@ function removeCluster() {
 function addAsset() {
   const account = prompt("Account name");
   if (!account) return;
+  const normalizedAccount = normalizeTextInput(account);
   const balance = parseAmount(prompt("Current balance") || "0");
-  const id = `${slugify(account)}-${Date.now()}`;
+  const id = `${slugify(normalizedAccount)}-${Date.now()}`;
   const date = toDateInputValue(new Date());
-  state.assets.push({ id, account, balance, date });
+  state.assets.push({ id, account: normalizedAccount, balance, date });
   state.assetUpdatedAt = date;
   persist();
   render();
@@ -810,12 +815,17 @@ function addAsset() {
 function handleAssetAction(event) {
   const button = event.target.closest("[data-asset-action]");
   if (!button) return;
-  const asset = state.assets.find((item) => item.id === button.dataset.asset);
+  const assetIndex = state.assets.findIndex((item) => item.id === button.dataset.asset);
+  const asset = state.assets[assetIndex];
   if (!asset) return;
 
   if (button.dataset.assetAction === "remove") {
     if (!confirm(`Remove ${asset.account}?`)) return;
     state.assets = state.assets.filter((item) => item.id !== asset.id);
+  } else if (button.dataset.assetAction === "up" && assetIndex > 0) {
+    [state.assets[assetIndex - 1], state.assets[assetIndex]] = [state.assets[assetIndex], state.assets[assetIndex - 1]];
+  } else if (button.dataset.assetAction === "down" && assetIndex < state.assets.length - 1) {
+    [state.assets[assetIndex + 1], state.assets[assetIndex]] = [state.assets[assetIndex], state.assets[assetIndex + 1]];
   }
 
   state.assetUpdatedAt = toDateInputValue(new Date());
@@ -830,7 +840,7 @@ function handleAssetFieldChange(event) {
   if (!asset) return;
 
   if (input.dataset.assetField === "account") {
-    asset.account = input.value.trim() || asset.account;
+    asset.account = normalizeTextInput(input.value) || asset.account;
   } else {
     asset.balance = parseAmount(input.value);
   }
@@ -1112,8 +1122,25 @@ function formatMoney(value) {
 }
 
 function compactMoney(value) {
-  if (value >= 1000) return `${Math.round(value / 1000)}k`;
+  if (value >= 1000) {
+    const amount = value / 1000;
+    const rounded = amount >= 10 ? Math.round(amount).toString() : amount.toFixed(1).replace(/\.0$/, "");
+    return `${rounded}k`;
+  }
   return Math.round(value).toString();
+}
+
+function getBudgetStatusClass(percent) {
+  if (percent >= 100) return "over";
+  if (percent >= 70) return "warning";
+  return "";
+}
+
+function normalizeTextInput(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/\b[a-z]/g, (letter) => letter.toUpperCase());
 }
 
 function getMonthKey(date) {
