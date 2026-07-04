@@ -1122,12 +1122,16 @@ function formatMoney(value) {
 }
 
 function compactMoney(value) {
-  if (value >= 1000) {
+  if (value >= 10000) {
     const amount = value / 1000;
-    const rounded = amount >= 10 ? Math.round(amount).toString() : amount.toFixed(1).replace(/\.0$/, "");
+    const rounded = Number.isInteger(amount) ? amount.toString() : amount.toFixed(1).replace(/\.0$/, "");
     return `${rounded}k`;
   }
-  return Math.round(value).toString();
+  return formatPlainNumber(value);
+}
+
+function formatPlainNumber(value) {
+  return new Intl.NumberFormat("en-PH", { maximumFractionDigits: 2 }).format(value);
 }
 
 function getBudgetStatusClass(percent) {
