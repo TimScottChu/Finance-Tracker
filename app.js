@@ -58,6 +58,7 @@ let selectedCategory = state.categories.expense[0].id;
 let assetsEditMode = false;
 let categoryEditMode = false;
 let transactionEditMode = false;
+let selectedDateDetailsOpen = false;
 let editingTransactionId = "";
 let selectedCardDetailId = "";
 let summaryValuesVisible = true;
@@ -110,6 +111,7 @@ const els = {
   homeBudgetBars: document.querySelector("#home-budget-bars"),
   paymentMethodList: document.querySelector("#payment-method-list"),
   calendarGrid: document.querySelector("#calendar-grid"),
+  selectedDatePanel: document.querySelector("#selected-date-panel"),
   selectedDateTitle: document.querySelector("#selected-date-title"),
   selectedDateTotal: document.querySelector("#selected-date-total"),
   selectedDateList: document.querySelector("#selected-date-list"),
@@ -213,7 +215,12 @@ function bindEvents() {
   els.calendarGrid.addEventListener("click", (event) => {
     const button = event.target.closest("[data-date]");
     if (!button) return;
-    selectedDate = button.dataset.date;
+    if (selectedDate === button.dataset.date && selectedDateDetailsOpen) {
+      selectedDateDetailsOpen = false;
+    } else {
+      selectedDate = button.dataset.date;
+      selectedDateDetailsOpen = true;
+    }
     transactionEditMode = false;
     renderCalendar();
     renderSelectedDateTransactions();
@@ -323,6 +330,7 @@ function changeMonth(offset) {
   const date = new Date(year, month - 1 + offset, 1);
   currentMonth = getMonthKey(date);
   selectedDate = selectedDate.startsWith(currentMonth) ? selectedDate : `${currentMonth}-01`;
+  selectedDateDetailsOpen = false;
   ensureMonthBudget(currentMonth);
   clampClusterIndex();
   render();
@@ -415,7 +423,7 @@ function renderCalendar() {
       .filter((item) => item.date === dateKey && item.type === "expense")
       .reduce((sum, item) => sum + item.amount, 0);
     cells.push(`
-      <button class="calendar-cell ${dateKey === todayKey ? "today" : ""} ${dateKey === selectedDate ? "selected" : ""}" type="button" data-date="${dateKey}">
+      <button class="calendar-cell ${dateKey === todayKey ? "today" : ""} ${dateKey === selectedDate && selectedDateDetailsOpen ? "selected" : ""}" type="button" data-date="${dateKey}">
         <strong>${day}</strong>
         ${spent ? `<small>-${compactMoney(spent)}</small>` : ""}
       </button>
@@ -426,6 +434,8 @@ function renderCalendar() {
 }
 
 function renderSelectedDateTransactions() {
+  els.selectedDatePanel.classList.toggle("hidden", !selectedDateDetailsOpen);
+  if (!selectedDateDetailsOpen) return;
   const items = state.transactions
     .filter((item) => item.date === selectedDate)
     .sort((a, b) => b.time.localeCompare(a.time));
@@ -741,6 +751,7 @@ function saveTransaction() {
   els.amount.value = "";
   els.note.value = "";
   selectedDate = els.date.value;
+  selectedDateDetailsOpen = true;
   currentMonth = getMonthKey(new Date(`${selectedDate}T00:00:00`));
   setDateTimeDefaults();
   render();
@@ -845,6 +856,7 @@ function saveEditedTransaction(event) {
   transaction.note = normalizeTextInput(els.editTransactionNote.value);
 
   selectedDate = transaction.date;
+  selectedDateDetailsOpen = true;
   currentMonth = getMonthKey(new Date(`${selectedDate}T00:00:00`));
   ensureMonthBudget(currentMonth);
   persist();
