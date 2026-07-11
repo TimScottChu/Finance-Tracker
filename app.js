@@ -62,6 +62,7 @@ let selectedDateDetailsOpen = false;
 let editingTransactionId = "";
 let selectedCardDetailId = "";
 let summaryValuesVisible = true;
+let assetsValuesVisible = true;
 let expandedSummaryCategoryId = "";
 let calculatorTarget = null;
 let calculatorExpression = "";
@@ -161,6 +162,7 @@ const els = {
   assetTotal: document.querySelector("#asset-total"),
   assetTitle: document.querySelector("#asset-title"),
   addAsset: document.querySelector("#add-asset"),
+  toggleAssetsVisibility: document.querySelector("#toggle-assets-visibility"),
   toggleAssetsEdit: document.querySelector("#toggle-assets-edit"),
   exportCsv: document.querySelector("#export-csv"),
   exportAssetsCsv: document.querySelector("#export-assets-csv"),
@@ -314,6 +316,11 @@ function bindEvents() {
   els.addCluster.addEventListener("click", addCluster);
   els.removeCluster.addEventListener("click", removeCluster);
   els.addAsset.addEventListener("click", addAsset);
+  els.toggleAssetsVisibility.addEventListener("click", () => {
+    assetsValuesVisible = !assetsValuesVisible;
+    if (!assetsValuesVisible) assetsEditMode = false;
+    renderAssets();
+  });
   els.toggleAssetsEdit.addEventListener("click", () => {
     assetsEditMode = !assetsEditMode;
     renderAssets();
@@ -705,8 +712,11 @@ function renderAssets() {
   const total = state.assets.reduce((sum, asset) => sum + asset.balance, 0);
   const trackerDate = state.assetUpdatedAt || latestAssetDate();
   els.assetTitle.textContent = `Asset tracker (${formatDisplayDate(trackerDate)})`;
-  els.assetTotal.textContent = formatMoney(total);
+  els.assetTotal.textContent = formatAssetMoney(total);
+  els.toggleAssetsVisibility.classList.toggle("hidden-values", !assetsValuesVisible);
+  els.toggleAssetsVisibility.setAttribute("aria-label", assetsValuesVisible ? "Hide asset values" : "Show asset values");
   els.toggleAssetsEdit.textContent = assetsEditMode ? "Done" : "Edit";
+  els.toggleAssetsEdit.classList.toggle("hidden", !assetsValuesVisible);
   els.addAsset.classList.toggle("hidden", !assetsEditMode);
   els.assetsList.innerHTML = `
     <div class="asset-header ${assetsEditMode ? "editing" : ""}">
@@ -720,12 +730,12 @@ function renderAssets() {
           ${
             assetsEditMode
               ? `<input class="asset-account-input" value="${escapeAttribute(asset.account)}" data-asset-field="account" data-asset="${asset.id}" aria-label="Account name" />`
-              : `<strong>${escapeHtml(asset.account)}</strong>`
+              : `<strong>${assetsValuesVisible ? escapeHtml(asset.account) : "Asset"}</strong>`
           }
           ${
             assetsEditMode
               ? `<label class="asset-balance-input"><span>PHP</span><input inputmode="decimal" value="${asset.balance}" data-asset-field="balance" data-asset="${asset.id}" aria-label="${escapeAttribute(asset.account)} balance" /></label>`
-              : `<span>${formatMoney(asset.balance)}</span>`
+              : `<span>${formatAssetMoney(asset.balance)}</span>`
           }
           ${
             assetsEditMode
@@ -1467,6 +1477,10 @@ function formatMoney(value) {
 
 function formatPrivateMoney(value) {
   return summaryValuesVisible ? formatMoney(value) : "---";
+}
+
+function formatAssetMoney(value) {
+  return assetsValuesVisible ? formatMoney(value) : "---";
 }
 
 function compactMoney(value) {

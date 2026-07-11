@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#10bfa8" />
     <title>PHP Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=18" />
+    <link rel="stylesheet" href="styles.css?v=19" />
   </head>
   <body>
     <div class="app-shell">
@@ -197,7 +197,10 @@
           <section class="panel">
             <div class="section-heading">
               <h2 id="asset-title">Asset tracker</h2>
-              <button class="text-button" id="toggle-assets-edit" type="button">Edit</button>
+              <div class="inline-actions">
+                <button class="visibility-toggle" id="toggle-assets-visibility" type="button" aria-label="Hide asset values"></button>
+                <button class="text-button" id="toggle-assets-edit" type="button">Edit</button>
+              </div>
             </div>
             <button class="secondary-button hidden" id="add-asset" type="button">Add asset</button>
             <div class="asset-summary">
@@ -209,7 +212,7 @@
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v18</p>
+          <p class="app-version">App version v19</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
             <button class="export-tile export-wide" id="export-assets-csv" type="button">Export assets CSV</button>
@@ -346,6 +349,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=18"></script>
+    <script src="app.js?v=19"></script>
   </body>
 </html>
