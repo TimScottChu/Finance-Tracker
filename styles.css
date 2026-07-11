@@ -440,7 +440,8 @@ main {
 
 .transaction-amount-input {
   display: grid;
-  grid-template-columns: auto 1fr;
+  grid-template-columns: auto 1fr 38px;
+  align-items: center;
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -460,6 +461,13 @@ main {
   border-left: 1px solid var(--line);
   border-radius: 0;
   text-align: right;
+}
+
+.transaction-amount-input .calculator-open {
+  width: 30px;
+  height: 30px;
+  margin-right: 4px;
+  font-size: 16px;
 }
 
 .delete-transaction-button {
@@ -495,6 +503,75 @@ main {
 
 .modal-card .primary-button {
   width: 100%;
+}
+
+.calculator-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(0, 0, 0, 0.52);
+}
+
+.calculator-sheet {
+  width: 100%;
+  max-width: 520px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 18px 18px 0 0;
+  background: #fff;
+  box-shadow: 0 -18px 50px rgba(15, 23, 42, 0.2);
+}
+
+.calculator-display {
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  border-bottom: 1px solid var(--line);
+  padding: 18px 22px;
+  color: var(--mint-dark);
+}
+
+.calculator-display span {
+  font-size: 26px;
+  font-weight: 900;
+}
+
+.calculator-display strong {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 34px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.calculator-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.calculator-grid button {
+  min-height: 68px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  color: var(--text);
+  background: #fff;
+  font-size: 28px;
+}
+
+.calculator-grid button:nth-child(4n) {
+  border-right: 0;
+}
+
+.calculator-ok {
+  grid-row: span 2;
+  color: #fff !important;
+  background: var(--mint) !important;
+  font-size: 24px !important;
+  font-weight: 900;
 }
 
 .amount-negative {
@@ -622,6 +699,18 @@ main {
   color: inherit;
   background: transparent;
   font-size: 44px;
+}
+
+.calculator-open {
+  flex: 0 0 auto;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--mint);
+  font-size: 20px;
+  font-weight: 900;
 }
 
 .chips {

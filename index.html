@@ -130,7 +130,8 @@
 
             <label class="amount-field">
               <span id="amount-prefix">-</span>
-              <input id="amount" inputmode="decimal" autocomplete="off" placeholder="0" required />
+              <input id="amount" inputmode="decimal" autocomplete="off" placeholder="0" readonly required />
+              <button class="calculator-open" type="button" data-calculator-target="amount" aria-label="Open calculator">=</button>
             </label>
 
             <label class="entry-cluster-row" id="entry-cluster-row">
@@ -273,7 +274,8 @@
             <span>Amount</span>
             <div class="transaction-amount-input">
               <strong id="edit-transaction-prefix">- PHP</strong>
-              <input id="edit-transaction-amount" inputmode="decimal" required />
+              <input id="edit-transaction-amount" inputmode="decimal" readonly required />
+              <button class="calculator-open" type="button" data-calculator-target="edit-transaction-amount" aria-label="Open calculator">=</button>
             </div>
           </label>
           <label>
@@ -310,6 +312,36 @@
           <strong id="card-detail-total">PHP 0.00</strong>
         </div>
         <div class="list" id="card-detail-list"></div>
+      </section>
+    </div>
+
+    <div class="calculator-backdrop hidden" id="calculator-modal" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
+      <section class="calculator-sheet">
+        <div class="calculator-display">
+          <span>PHP</span>
+          <strong id="calculator-title">0</strong>
+        </div>
+        <div class="calculator-grid" id="calculator-grid">
+          <button type="button" data-calculator-key="clear">C</button>
+          <button type="button" data-calculator-key="/">÷</button>
+          <button type="button" data-calculator-key="*">×</button>
+          <button type="button" data-calculator-key="back">⌫</button>
+          <button type="button" data-calculator-key="7">7</button>
+          <button type="button" data-calculator-key="8">8</button>
+          <button type="button" data-calculator-key="9">9</button>
+          <button type="button" data-calculator-key="-">−</button>
+          <button type="button" data-calculator-key="4">4</button>
+          <button type="button" data-calculator-key="5">5</button>
+          <button type="button" data-calculator-key="6">6</button>
+          <button type="button" data-calculator-key="+">+</button>
+          <button type="button" data-calculator-key="1">1</button>
+          <button type="button" data-calculator-key="2">2</button>
+          <button type="button" data-calculator-key="3">3</button>
+          <button class="calculator-ok" type="button" data-calculator-key="apply">OK</button>
+          <button type="button" data-calculator-key="0">0</button>
+          <button type="button" data-calculator-key=".">.</button>
+          <button type="button" data-calculator-key="=">=</button>
+        </div>
       </section>
     </div>
 

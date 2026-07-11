@@ -63,6 +63,8 @@ let editingTransactionId = "";
 let selectedCardDetailId = "";
 let summaryValuesVisible = true;
 let expandedSummaryCategoryId = "";
+let calculatorTarget = null;
+let calculatorExpression = "";
 let activeClusterIndex = 0;
 let selectedEntryClusterId = "";
 let selectedPaymentMethod = PAYMENT_METHODS[0];
@@ -138,6 +140,10 @@ const els = {
   editTransactionDate: document.querySelector("#edit-transaction-date"),
   editTransactionNote: document.querySelector("#edit-transaction-note"),
   deleteTransaction: document.querySelector("#delete-transaction"),
+  calculatorModal: document.querySelector("#calculator-modal"),
+  calculatorTitle: document.querySelector("#calculator-title"),
+  calculatorGrid: document.querySelector("#calculator-grid"),
+  calculatorOpenButtons: document.querySelectorAll("[data-calculator-target]"),
   budgetClusterPrev: document.querySelector("#budget-cluster-prev"),
   budgetClusterNext: document.querySelector("#budget-cluster-next"),
   budgetClusterName: document.querySelector("#budget-cluster-name"),
@@ -268,6 +274,13 @@ function bindEvents() {
     populatePaymentMethods(els.editTransactionPaymentMethod, els.editTransactionPaymentRow, els.editTransactionType.value === "expense", els.editTransactionPaymentMethod.value);
   });
   els.deleteTransaction.addEventListener("click", deleteEditingTransaction);
+  els.calculatorOpenButtons.forEach((button) => {
+    button.addEventListener("click", () => openCalculator(document.querySelector(`#${button.dataset.calculatorTarget}`)));
+  });
+  els.calculatorGrid.addEventListener("click", handleCalculatorKey);
+  els.calculatorModal.addEventListener("click", (event) => {
+    if (event.target === els.calculatorModal) closeCalculator();
+  });
 
   els.typeButtons.forEach((button) => {
     button.addEventListener("click", () => {
@@ -725,6 +738,67 @@ function renderAssets() {
       `)
       .join("")}
   `;
+}
+
+function openCalculator(target) {
+  if (!target) return;
+  calculatorTarget = target;
+  calculatorExpression = target.value || "";
+  renderCalculator();
+  els.calculatorModal.classList.remove("hidden");
+}
+
+function closeCalculator() {
+  calculatorTarget = null;
+  calculatorExpression = "";
+  els.calculatorModal.classList.add("hidden");
+}
+
+function handleCalculatorKey(event) {
+  const button = event.target.closest("[data-calculator-key]");
+  if (!button) return;
+  const key = button.dataset.calculatorKey;
+
+  if (key === "clear") {
+    calculatorExpression = "";
+  } else if (key === "back") {
+    calculatorExpression = calculatorExpression.slice(0, -1);
+  } else if (key === "=") {
+    calculatorExpression = formatCalculatorResult(parseAmount(calculatorExpression));
+  } else if (key === "apply") {
+    const amount = parseAmount(calculatorExpression);
+    if (calculatorTarget) {
+      calculatorTarget.value = amount ? formatCalculatorResult(amount) : "";
+      calculatorTarget.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    closeCalculator();
+    return;
+  } else {
+    calculatorExpression = appendCalculatorKey(calculatorExpression, key);
+  }
+
+  renderCalculator();
+}
+
+function appendCalculatorKey(expression, key) {
+  const operators = ["+", "-", "*", "/"];
+  if (operators.includes(key) && (!expression || operators.includes(expression.at(-1)))) {
+    return expression ? `${expression.slice(0, -1)}${key}` : "";
+  }
+  if (key === "." && expression.split(/[+\-*/]/).at(-1).includes(".")) return expression;
+  return `${expression}${key}`;
+}
+
+function renderCalculator() {
+  const result = parseAmount(calculatorExpression);
+  els.calculatorTitle.textContent = calculatorExpression || "0";
+  if (calculatorExpression && /[+\-*/xX]/.test(calculatorExpression) && result) {
+    els.calculatorTitle.textContent = `${calculatorExpression} = ${formatPlainNumber(result)}`;
+  }
+}
+
+function formatCalculatorResult(value) {
+  return Number(value.toFixed(2)).toString();
 }
 
 function saveTransaction() {
