@@ -65,6 +65,7 @@ let summaryValuesVisible = true;
 let expandedSummaryCategoryId = "";
 let calculatorTarget = null;
 let calculatorExpression = "";
+let lastCalculatorOpenAt = 0;
 let activeClusterIndex = 0;
 let selectedEntryClusterId = "";
 let selectedPaymentMethod = PAYMENT_METHODS[0];
@@ -275,11 +276,18 @@ function bindEvents() {
   });
   els.deleteTransaction.addEventListener("click", deleteEditingTransaction);
   els.calculatorOpenButtons.forEach((button) => {
-    button.addEventListener("click", (event) => {
+    const openFromButton = (event) => {
       event.preventDefault();
       event.stopPropagation();
+      const now = Date.now();
+      if (now - lastCalculatorOpenAt < 350) return;
+      lastCalculatorOpenAt = now;
       openCalculator(getCalculatorTarget(button.dataset.calculatorTarget));
-    });
+    };
+    if (window.PointerEvent) {
+      button.addEventListener("pointerup", openFromButton);
+    }
+    button.addEventListener("click", openFromButton);
   });
   els.calculatorGrid.addEventListener("click", handleCalculatorKey);
   els.calculatorModal.addEventListener("click", (event) => {

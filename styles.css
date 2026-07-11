@@ -419,7 +419,8 @@ main {
   gap: 10px;
 }
 
-.transaction-edit-grid label {
+.transaction-edit-grid label,
+.transaction-edit-grid .form-control {
   display: grid;
   gap: 4px;
 }

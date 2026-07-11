@@ -128,11 +128,11 @@
               <button type="button" data-type="income">Income</button>
             </div>
 
-            <label class="amount-field">
+            <div class="amount-field">
               <span id="amount-prefix">-</span>
               <input id="amount" inputmode="decimal" autocomplete="off" placeholder="0" required />
               <button class="calculator-open" type="button" data-calculator-target="amount" aria-label="Open calculator">=</button>
-            </label>
+            </div>
 
             <label class="entry-cluster-row" id="entry-cluster-row">
               <span>Budget group</span>
@@ -270,14 +270,14 @@
             <span>Payment method</span>
             <select id="edit-transaction-payment-method"></select>
           </label>
-          <label>
+          <div class="form-control">
             <span>Amount</span>
             <div class="transaction-amount-input">
               <strong id="edit-transaction-prefix">- PHP</strong>
               <input id="edit-transaction-amount" inputmode="decimal" required />
               <button class="calculator-open" type="button" data-calculator-target="edit-transaction-amount" aria-label="Open calculator">=</button>
             </div>
-          </label>
+          </div>
           <label>
             <span>Time</span>
             <input id="edit-transaction-time" type="time" required />
