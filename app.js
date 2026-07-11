@@ -275,7 +275,11 @@ function bindEvents() {
   });
   els.deleteTransaction.addEventListener("click", deleteEditingTransaction);
   els.calculatorOpenButtons.forEach((button) => {
-    button.addEventListener("click", () => openCalculator(document.querySelector(`#${button.dataset.calculatorTarget}`)));
+    button.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      openCalculator(getCalculatorTarget(button.dataset.calculatorTarget));
+    });
   });
   els.calculatorGrid.addEventListener("click", handleCalculatorKey);
   els.calculatorModal.addEventListener("click", (event) => {
@@ -746,6 +750,12 @@ function openCalculator(target) {
   calculatorExpression = target.value || "";
   renderCalculator();
   els.calculatorModal.classList.remove("hidden");
+}
+
+function getCalculatorTarget(targetId) {
+  if (targetId === "amount") return els.amount;
+  if (targetId === "edit-transaction-amount") return els.editTransactionAmount;
+  return document.querySelector(`#${targetId}`);
 }
 
 function closeCalculator() {
