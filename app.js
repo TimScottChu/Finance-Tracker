@@ -275,20 +275,9 @@ function bindEvents() {
     populatePaymentMethods(els.editTransactionPaymentMethod, els.editTransactionPaymentRow, els.editTransactionType.value === "expense", els.editTransactionPaymentMethod.value);
   });
   els.deleteTransaction.addEventListener("click", deleteEditingTransaction);
-  els.calculatorOpenButtons.forEach((button) => {
-    const openFromButton = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      const now = Date.now();
-      if (now - lastCalculatorOpenAt < 350) return;
-      lastCalculatorOpenAt = now;
-      openCalculator(getCalculatorTarget(button.dataset.calculatorTarget));
-    };
-    if (window.PointerEvent) {
-      button.addEventListener("pointerup", openFromButton);
-    }
-    button.addEventListener("click", openFromButton);
-  });
+  document.addEventListener("touchend", openCalculatorFromEvent, { passive: false });
+  document.addEventListener("pointerup", openCalculatorFromEvent);
+  document.addEventListener("click", openCalculatorFromEvent);
   els.calculatorGrid.addEventListener("click", handleCalculatorKey);
   els.calculatorModal.addEventListener("click", (event) => {
     if (event.target === els.calculatorModal) closeCalculator();
@@ -758,6 +747,18 @@ function openCalculator(target) {
   calculatorExpression = target.value || "";
   renderCalculator();
   els.calculatorModal.classList.remove("hidden");
+}
+
+function openCalculatorFromEvent(event) {
+  const button = event.target.closest?.("[data-calculator-target]");
+  if (!button) return;
+  event.preventDefault();
+  event.stopPropagation();
+
+  const now = Date.now();
+  if (now - lastCalculatorOpenAt < 350) return;
+  lastCalculatorOpenAt = now;
+  openCalculator(getCalculatorTarget(button.dataset.calculatorTarget));
 }
 
 function getCalculatorTarget(targetId) {
