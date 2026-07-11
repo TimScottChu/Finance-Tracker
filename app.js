@@ -815,11 +815,7 @@ function appendCalculatorKey(expression, key) {
 }
 
 function renderCalculator() {
-  const result = parseAmount(calculatorExpression);
   els.calculatorTitle.textContent = calculatorExpression || "0";
-  if (calculatorExpression && /[+\-*/xX]/.test(calculatorExpression) && result) {
-    els.calculatorTitle.textContent = `${calculatorExpression} = ${formatPlainNumber(result)}`;
-  }
 }
 
 function formatCalculatorResult(value) {
