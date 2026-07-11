@@ -278,6 +278,7 @@ function bindEvents() {
   document.addEventListener("touchend", openCalculatorFromEvent, { passive: false });
   document.addEventListener("pointerup", openCalculatorFromEvent);
   document.addEventListener("click", openCalculatorFromEvent);
+  document.addEventListener("keydown", openCalculatorFromKeyboard);
   els.calculatorGrid.addEventListener("click", handleCalculatorKey);
   els.calculatorModal.addEventListener("click", (event) => {
     if (event.target === els.calculatorModal) closeCalculator();
@@ -759,6 +760,11 @@ function openCalculatorFromEvent(event) {
   if (now - lastCalculatorOpenAt < 350) return;
   lastCalculatorOpenAt = now;
   openCalculator(getCalculatorTarget(button.dataset.calculatorTarget));
+}
+
+function openCalculatorFromKeyboard(event) {
+  if (event.key !== "Enter" && event.key !== " ") return;
+  openCalculatorFromEvent(event);
 }
 
 function getCalculatorTarget(targetId) {

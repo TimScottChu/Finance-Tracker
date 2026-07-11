@@ -447,6 +447,8 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #fff;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .transaction-amount-input strong {
@@ -691,6 +693,8 @@ main {
   margin-bottom: 22px;
   color: var(--pink);
   font-size: 44px;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .amount-field input {
