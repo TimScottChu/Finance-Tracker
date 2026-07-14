@@ -1106,6 +1106,10 @@ main {
   font-size: 12px;
 }
 
+#add-payment-method {
+  margin-top: 12px;
+}
+
 .feedback-field {
   display: grid;
   gap: 8px;

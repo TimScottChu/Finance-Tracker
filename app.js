@@ -61,6 +61,7 @@ let entryType = "expense";
 let selectedCategory = state.categories.expense[0].id;
 let assetsEditMode = false;
 let categoryEditMode = false;
+let paymentMethodsEditMode = false;
 let transactionEditMode = false;
 let selectedDateDetailsOpen = false;
 let editingTransactionId = "";
@@ -173,6 +174,7 @@ const els = {
   exportBackup: document.querySelector("#export-backup"),
   importBackup: document.querySelector("#import-backup"),
   paymentMethodsList: document.querySelector("#payment-methods-list"),
+  togglePaymentMethodsEdit: document.querySelector("#toggle-payment-methods-edit"),
   addPaymentMethod: document.querySelector("#add-payment-method"),
   feedbackNotes: document.querySelector("#feedback-notes"),
   saveFeedback: document.querySelector("#save-feedback"),
@@ -337,6 +339,10 @@ function bindEvents() {
   els.exportAssetsCsv.addEventListener("click", exportAssetsCsv);
   els.exportBackup.addEventListener("click", exportBackup);
   els.importBackup.addEventListener("change", importBackup);
+  els.togglePaymentMethodsEdit.addEventListener("click", () => {
+    paymentMethodsEditMode = !paymentMethodsEditMode;
+    renderPaymentMethodsSettings();
+  });
   els.addPaymentMethod.addEventListener("click", addPaymentMethod);
   els.paymentMethodsList.addEventListener("click", handlePaymentMethodAction);
   els.saveFeedback.addEventListener("click", saveFeedback);
@@ -557,6 +563,8 @@ function renderPaymentMethodTotals() {
 }
 
 function renderPaymentMethodsSettings() {
+  els.togglePaymentMethodsEdit.textContent = paymentMethodsEditMode ? "Done" : "Edit";
+  els.addPaymentMethod.classList.toggle("hidden", !paymentMethodsEditMode);
   els.paymentMethodsList.innerHTML = `
     ${state.paymentMethods
       .map(
@@ -566,10 +574,14 @@ function renderPaymentMethodsSettings() {
               <strong>${escapeHtml(method.name)}</strong>
               <small>Payment method</small>
             </span>
-            <span class="settings-row-actions">
-              <button class="small-action-button" type="button" data-payment-action="edit-method" data-payment-id="${method.id}">Edit</button>
-              <button class="small-action-button danger" type="button" data-payment-action="remove-method" data-payment-id="${method.id}">Remove</button>
-            </span>
+            ${
+              paymentMethodsEditMode
+                ? `<span class="settings-row-actions">
+                    <button class="small-action-button" type="button" data-payment-action="edit-method" data-payment-id="${method.id}">Edit</button>
+                    <button class="small-action-button danger" type="button" data-payment-action="remove-method" data-payment-id="${method.id}">Remove</button>
+                  </span>`
+                : ""
+            }
           </div>
         `
       )
@@ -582,10 +594,14 @@ function renderPaymentMethodsSettings() {
               <strong>${escapeHtml(card.method)}</strong>
               <small>Credit card - appears in Summary</small>
             </span>
-            <span class="settings-row-actions">
-              <button class="small-action-button" type="button" data-payment-action="edit-card" data-payment-id="${card.id}">Edit</button>
-              <button class="small-action-button danger" type="button" data-payment-action="remove-card" data-payment-id="${card.id}">Remove</button>
-            </span>
+            ${
+              paymentMethodsEditMode
+                ? `<span class="settings-row-actions">
+                    <button class="small-action-button" type="button" data-payment-action="edit-card" data-payment-id="${card.id}">Edit</button>
+                    <button class="small-action-button danger" type="button" data-payment-action="remove-card" data-payment-id="${card.id}">Remove</button>
+                  </span>`
+                : ""
+            }
           </div>
         `
       )
@@ -1132,6 +1148,7 @@ function addPaymentMethod() {
 function handlePaymentMethodAction(event) {
   const button = event.target.closest("[data-payment-action]");
   if (!button) return;
+  if (!paymentMethodsEditMode) return;
   if (button.dataset.paymentAction === "remove-method") {
     removePaymentMethod(button.dataset.paymentId);
   } else if (button.dataset.paymentAction === "remove-card") {

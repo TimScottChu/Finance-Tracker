@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#10bfa8" />
     <title>PHP Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=21" />
+    <link rel="stylesheet" href="styles.css?v=22" />
   </head>
   <body>
     <div class="app-shell">
@@ -212,7 +212,7 @@
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v21</p>
+          <p class="app-version">App version v22</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
             <button class="export-tile export-wide" id="export-assets-csv" type="button">Export assets CSV</button>
@@ -226,10 +226,11 @@
           <section class="panel">
             <div class="section-heading">
               <h2>Payment methods</h2>
-              <button class="text-button" id="add-payment-method" type="button">Add</button>
+              <button class="text-button" id="toggle-payment-methods-edit" type="button">Edit</button>
             </div>
             <p class="helper-text">Credit card methods appear in Summary and can have their own cutoff dates.</p>
             <div class="settings-list" id="payment-methods-list"></div>
+            <button class="secondary-button hidden" id="add-payment-method" type="button">Add payment method</button>
           </section>
 
           <section class="panel">
@@ -358,6 +359,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=21"></script>
+    <script src="app.js?v=22"></script>
   </body>
 </html>
