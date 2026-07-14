@@ -43,11 +43,15 @@ const DEFAULT_ASSETS = [
   { id: "bpi-uitf", date: "2026-03-09", account: "BPI UITF", balance: 2108519.19 }
 ];
 
-const CREDIT_CARD_METHODS = [
-  { id: "bpi", name: "BPI", method: "Credit Card - BPI", cutoffDay: 25 },
-  { id: "metro", name: "Metro", method: "Credit Card - Metro", cutoffDay: 25 }
+const DEFAULT_PAYMENT_METHODS = [
+  { id: "cash", name: "Cash", locked: true },
+  { id: "digital-wallet", name: "Digital Wallet", locked: true }
 ];
-const PAYMENT_METHODS = ["Cash", ...CREDIT_CARD_METHODS.map((card) => card.method), "Digital Wallet"];
+
+const DEFAULT_CREDIT_CARDS = [
+  { id: "bpi", name: "BPI", method: "Credit Card - BPI", cutoffDay: 25, locked: true },
+  { id: "metro", name: "Metro", method: "Credit Card - Metro", cutoffDay: 25, locked: true }
+];
 
 let state = loadState();
 let currentMonth = getMonthKey(new Date());
@@ -69,7 +73,7 @@ let calculatorExpression = "";
 let lastCalculatorOpenAt = 0;
 let activeClusterIndex = 0;
 let selectedEntryClusterId = "";
-let selectedPaymentMethod = PAYMENT_METHODS[0];
+let selectedPaymentMethod = getFallbackPaymentMethod();
 
 const peso = new Intl.NumberFormat("en-PH", {
   style: "currency",
@@ -168,6 +172,8 @@ const els = {
   exportAssetsCsv: document.querySelector("#export-assets-csv"),
   exportBackup: document.querySelector("#export-backup"),
   importBackup: document.querySelector("#import-backup"),
+  paymentMethodsList: document.querySelector("#payment-methods-list"),
+  addPaymentMethod: document.querySelector("#add-payment-method"),
   feedbackNotes: document.querySelector("#feedback-notes"),
   saveFeedback: document.querySelector("#save-feedback"),
   clearFeedback: document.querySelector("#clear-feedback"),
@@ -331,6 +337,8 @@ function bindEvents() {
   els.exportAssetsCsv.addEventListener("click", exportAssetsCsv);
   els.exportBackup.addEventListener("click", exportBackup);
   els.importBackup.addEventListener("change", importBackup);
+  els.addPaymentMethod.addEventListener("click", addPaymentMethod);
+  els.paymentMethodsList.addEventListener("click", handlePaymentMethodAction);
   els.saveFeedback.addEventListener("click", saveFeedback);
   els.clearFeedback.addEventListener("click", clearFeedback);
   els.exportFeedback.addEventListener("click", exportFeedback);
@@ -375,6 +383,7 @@ function render() {
   renderEntry();
   renderBudget();
   renderAssets();
+  renderPaymentMethodsSettings();
   renderHistory();
 }
 
@@ -513,11 +522,12 @@ function renderEntryClusterSelector() {
     .join("");
 }
 
-function populatePaymentMethods(select, row, visible, selected = PAYMENT_METHODS[0]) {
+function populatePaymentMethods(select, row, visible, selected = getFallbackPaymentMethod()) {
   row.classList.toggle("hidden", !visible);
   if (!visible) return;
-  const active = PAYMENT_METHODS.includes(selected) ? selected : PAYMENT_METHODS[0];
-  select.innerHTML = PAYMENT_METHODS.map((method) => `<option value="${method}" ${method === active ? "selected" : ""}>${method}</option>`).join("");
+  const methods = getPaymentMethods();
+  const active = methods.includes(selected) ? selected : getFallbackPaymentMethod();
+  select.innerHTML = methods.map((method) => `<option value="${escapeAttribute(method)}" ${method === active ? "selected" : ""}>${escapeHtml(method)}</option>`).join("");
 }
 
 function getEntryCategories() {
@@ -544,6 +554,37 @@ function renderPaymentMethodTotals() {
       `;
     })
     .join("");
+}
+
+function renderPaymentMethodsSettings() {
+  els.paymentMethodsList.innerHTML = `
+    ${state.paymentMethods
+      .map(
+        (method) => `
+          <div class="settings-row">
+            <span>
+              <strong>${escapeHtml(method.name)}</strong>
+              <small>Payment method</small>
+            </span>
+            ${method.locked ? `<small>Default</small>` : `<button class="small-action-button danger" type="button" data-payment-action="remove-method" data-payment-id="${method.id}">Remove</button>`}
+          </div>
+        `
+      )
+      .join("")}
+    ${state.creditCards
+      .map(
+        (card) => `
+          <div class="settings-row">
+            <span>
+              <strong>${escapeHtml(card.method)}</strong>
+              <small>Credit card - appears in Summary</small>
+            </span>
+            ${card.locked ? `<small>Default</small>` : `<button class="small-action-button danger" type="button" data-payment-action="remove-card" data-payment-id="${card.id}">Remove</button>`}
+          </div>
+        `
+      )
+      .join("")}
+  `;
 }
 
 function openCardDetail(cardId) {
@@ -1060,6 +1101,58 @@ function removeCluster() {
   render();
 }
 
+function addPaymentMethod() {
+  const name = normalizeTextInput(prompt("Payment method name", "Credit Card - ") || "");
+  if (!name) return;
+  if (getPaymentMethods().some((method) => method.toLowerCase() === name.toLowerCase())) {
+    alert("That payment method already exists.");
+    return;
+  }
+
+  const isCreditCard = confirm("Should this appear in Summary as a credit card?");
+  const id = uniquePaymentId(name, isCreditCard ? state.creditCards : state.paymentMethods);
+  if (isCreditCard) {
+    const cutoffDay = clampCutoffDay(prompt("Credit card cutoff day", "25") || "25");
+    state.creditCards.push({ id, name, method: name, cutoffDay, locked: false });
+  } else {
+    state.paymentMethods.push({ id, name, locked: false });
+  }
+
+  selectedPaymentMethod = name;
+  persist();
+  render();
+}
+
+function handlePaymentMethodAction(event) {
+  const button = event.target.closest("[data-payment-action]");
+  if (!button) return;
+  if (button.dataset.paymentAction === "remove-method") {
+    removePaymentMethod(button.dataset.paymentId);
+  } else if (button.dataset.paymentAction === "remove-card") {
+    removeCreditCardMethod(button.dataset.paymentId);
+  }
+}
+
+function removePaymentMethod(methodId) {
+  const method = state.paymentMethods.find((item) => item.id === methodId);
+  if (!method || method.locked) return;
+  if (!confirm(`Remove ${method.name}? Existing transactions will keep their saved label.`)) return;
+  state.paymentMethods = state.paymentMethods.filter((item) => item.id !== methodId);
+  if (selectedPaymentMethod === method.name) selectedPaymentMethod = getFallbackPaymentMethod();
+  persist();
+  render();
+}
+
+function removeCreditCardMethod(cardId) {
+  const card = state.creditCards.find((item) => item.id === cardId);
+  if (!card || card.locked) return;
+  if (!confirm(`Remove ${card.method}? Existing transactions will keep their saved label.`)) return;
+  state.creditCards = state.creditCards.filter((item) => item.id !== cardId);
+  if (selectedPaymentMethod === card.method) selectedPaymentMethod = getFallbackPaymentMethod();
+  persist();
+  render();
+}
+
 function addAsset() {
   const account = prompt("Account name");
   if (!account) return;
@@ -1188,13 +1281,14 @@ function getMonthTotals(monthKey) {
 }
 
 function getPaymentMethodTotals(monthKey) {
+  const methods = getPaymentMethods();
   return state.transactions
     .filter((item) => item.type === "expense" && item.date.startsWith(monthKey))
     .reduce((totals, item) => {
-      const method = PAYMENT_METHODS.includes(item.paymentMethod) ? item.paymentMethod : PAYMENT_METHODS[0];
+      const method = methods.includes(item.paymentMethod) ? item.paymentMethod : getFallbackPaymentMethod();
       totals[method] += item.amount;
       return totals;
-    }, Object.fromEntries(PAYMENT_METHODS.map((method) => [method, 0])));
+    }, Object.fromEntries(methods.map((method) => [method, 0])));
 }
 
 function getCreditCardTransactions(cardId, monthKey) {
@@ -1208,6 +1302,36 @@ function getCreditCardTransactions(cardId, monthKey) {
 
 function getCreditCardSetting(cardId) {
   return state.creditCards.find((card) => card.id === cardId);
+}
+
+function getPaymentMethods() {
+  const normal = state.paymentMethods || structuredClone(DEFAULT_PAYMENT_METHODS);
+  const cash = normal.find((method) => method.id === "cash");
+  const rest = normal.filter((method) => method.id !== "cash");
+  return [...(cash ? [cash.name] : []), ...state.creditCards.map((card) => card.method), ...rest.map((method) => method.name)];
+}
+
+function getFallbackPaymentMethod() {
+  return getPaymentMethods()[0] || "Cash";
+}
+
+function getKnownPaymentMethods(paymentMethods = state.paymentMethods, creditCards = state.creditCards) {
+  const normal = paymentMethods || structuredClone(DEFAULT_PAYMENT_METHODS);
+  const cards = creditCards || structuredClone(DEFAULT_CREDIT_CARDS);
+  const cash = normal.find((method) => method.id === "cash");
+  const rest = normal.filter((method) => method.id !== "cash");
+  return [...(cash ? [cash.name] : []), ...cards.map((card) => card.method), ...rest.map((method) => method.name)];
+}
+
+function uniquePaymentId(name, collection) {
+  const base = slugify(name) || "payment-method";
+  let id = base;
+  let suffix = 2;
+  while (collection.some((item) => item.id === id)) {
+    id = `${base}-${suffix}`;
+    suffix += 1;
+  }
+  return id;
 }
 
 function getStatementPeriod(monthKey, cutoffDay) {
@@ -1296,27 +1420,73 @@ function loadState() {
 function normalizeState(input) {
   const categories = normalizeCategories(input.categories);
   const budgets = input.budgets || {};
+  const paymentMethods = normalizePaymentMethods(input.paymentMethods);
+  const creditCards = normalizeCreditCards(input.creditCards);
+  const knownPaymentMethods = getKnownPaymentMethods(paymentMethods, creditCards);
   Object.values(budgets).forEach((budget) => migrateBudget(budget, categories));
   return {
     categories,
-    transactions: normalizeTransactions(input.transactions, budgets, categories),
+    transactions: normalizeTransactions(input.transactions, budgets, categories, knownPaymentMethods),
     budgets,
     goals: input.goals || structuredClone(DEFAULT_GOALS),
-    creditCards: normalizeCreditCards(input.creditCards),
+    paymentMethods,
+    creditCards,
     assets: Array.isArray(input.assets) ? input.assets : structuredClone(DEFAULT_ASSETS),
     assetUpdatedAt: input.assetUpdatedAt || latestDateFromAssets(input.assets) || toDateInputValue(new Date())
   };
 }
 
 function normalizeCreditCards(cards) {
-  return CREDIT_CARD_METHODS.map((defaultCard) => {
+  const defaults = DEFAULT_CREDIT_CARDS.map((defaultCard) => {
     const saved = Array.isArray(cards) ? cards.find((card) => card.id === defaultCard.id) : null;
     return {
       ...defaultCard,
       name: saved?.name || defaultCard.name,
+      method: saved?.method || defaultCard.method,
       cutoffDay: clampCutoffDay(saved?.cutoffDay || defaultCard.cutoffDay)
     };
   });
+  const extras = Array.isArray(cards)
+    ? cards
+        .filter((card) => !DEFAULT_CREDIT_CARDS.some((defaultCard) => defaultCard.id === card.id))
+        .map((card) => {
+          const method = normalizeTextInput(card.method || card.name || "");
+          return method
+            ? {
+                id: card.id || uniquePaymentId(method, defaults),
+                name: normalizeTextInput(card.name || method),
+                method,
+                cutoffDay: clampCutoffDay(card.cutoffDay || 25),
+                locked: false
+              }
+            : null;
+        })
+        .filter(Boolean)
+    : [];
+  return [...defaults, ...extras];
+}
+
+function normalizePaymentMethods(methods) {
+  const defaults = DEFAULT_PAYMENT_METHODS.map((defaultMethod) => {
+    const saved = Array.isArray(methods)
+      ? methods.find((method) => (typeof method === "string" ? slugify(method) === defaultMethod.id : method.id === defaultMethod.id))
+      : null;
+    return {
+      ...defaultMethod,
+      name: typeof saved === "string" ? saved : saved?.name || defaultMethod.name
+    };
+  });
+  const extras = Array.isArray(methods)
+    ? methods
+        .map((method) => (typeof method === "string" ? { id: slugify(method), name: method } : method))
+        .filter((method) => method?.name && !DEFAULT_PAYMENT_METHODS.some((defaultMethod) => defaultMethod.id === method.id || defaultMethod.name.toLowerCase() === method.name.toLowerCase()))
+        .map((method) => ({
+          id: method.id || uniquePaymentId(method.name, defaults),
+          name: normalizeTextInput(method.name),
+          locked: false
+        }))
+    : [];
+  return [...defaults, ...extras];
 }
 
 function normalizeCategories(categories) {
@@ -1330,7 +1500,7 @@ function normalizeCategories(categories) {
   return normalized;
 }
 
-function normalizeTransactions(transactions, budgets = {}, categories = DEFAULT_CATEGORIES) {
+function normalizeTransactions(transactions, budgets = {}, categories = DEFAULT_CATEGORIES, paymentMethods = getKnownPaymentMethods()) {
   if (!Array.isArray(transactions)) return [];
   return transactions.map((transaction, index) => {
     const fallbackId = `transaction-${index}-${transaction.createdAt || ""}-${transaction.date || ""}-${transaction.time || ""}-${transaction.amount || 0}`;
@@ -1338,7 +1508,7 @@ function normalizeTransactions(transactions, budgets = {}, categories = DEFAULT_
       ...transaction,
       id: transaction.id || slugify(fallbackId) || crypto.randomUUID(),
       categoryId: transaction.categoryId === "utilities" ? "living-costs" : transaction.categoryId,
-      paymentMethod: normalizePaymentMethod(transaction)
+      paymentMethod: normalizePaymentMethod(transaction, paymentMethods)
     };
     if (normalized.type === "expense" && !normalized.clusterId) {
       normalized.clusterId = inferTransactionClusterId(normalized, budgets, categories);
@@ -1347,10 +1517,10 @@ function normalizeTransactions(transactions, budgets = {}, categories = DEFAULT_
   });
 }
 
-function normalizePaymentMethod(transaction) {
+function normalizePaymentMethod(transaction, paymentMethods = getKnownPaymentMethods()) {
   if (transaction.type !== "expense") return "";
-  if (transaction.paymentMethod === "Credit Card") return CREDIT_CARD_METHODS[0].method;
-  return PAYMENT_METHODS.includes(transaction.paymentMethod) ? transaction.paymentMethod : PAYMENT_METHODS[0];
+  if (transaction.paymentMethod === "Credit Card") return DEFAULT_CREDIT_CARDS[0].method;
+  return paymentMethods.includes(transaction.paymentMethod) ? transaction.paymentMethod : paymentMethods[0];
 }
 
 function migrateBudget(budget, categoriesSource = DEFAULT_CATEGORIES) {
