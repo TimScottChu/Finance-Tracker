@@ -44,13 +44,13 @@ const DEFAULT_ASSETS = [
 ];
 
 const DEFAULT_PAYMENT_METHODS = [
-  { id: "cash", name: "Cash", locked: true },
-  { id: "digital-wallet", name: "Digital Wallet", locked: true }
+  { id: "cash", name: "Cash" },
+  { id: "digital-wallet", name: "Digital Wallet" }
 ];
 
 const DEFAULT_CREDIT_CARDS = [
-  { id: "bpi", name: "BPI", method: "Credit Card - BPI", cutoffDay: 25, locked: true },
-  { id: "metro", name: "Metro", method: "Credit Card - Metro", cutoffDay: 25, locked: true }
+  { id: "bpi", name: "BPI", method: "Credit Card - BPI", cutoffDay: 25 },
+  { id: "metro", name: "Metro", method: "Credit Card - Metro", cutoffDay: 25 }
 ];
 
 let state = loadState();
@@ -566,7 +566,10 @@ function renderPaymentMethodsSettings() {
               <strong>${escapeHtml(method.name)}</strong>
               <small>Payment method</small>
             </span>
-            ${method.locked ? `<small>Default</small>` : `<button class="small-action-button danger" type="button" data-payment-action="remove-method" data-payment-id="${method.id}">Remove</button>`}
+            <span class="settings-row-actions">
+              <button class="small-action-button" type="button" data-payment-action="edit-method" data-payment-id="${method.id}">Edit</button>
+              <button class="small-action-button danger" type="button" data-payment-action="remove-method" data-payment-id="${method.id}">Remove</button>
+            </span>
           </div>
         `
       )
@@ -579,7 +582,10 @@ function renderPaymentMethodsSettings() {
               <strong>${escapeHtml(card.method)}</strong>
               <small>Credit card - appears in Summary</small>
             </span>
-            ${card.locked ? `<small>Default</small>` : `<button class="small-action-button danger" type="button" data-payment-action="remove-card" data-payment-id="${card.id}">Remove</button>`}
+            <span class="settings-row-actions">
+              <button class="small-action-button" type="button" data-payment-action="edit-card" data-payment-id="${card.id}">Edit</button>
+              <button class="small-action-button danger" type="button" data-payment-action="remove-card" data-payment-id="${card.id}">Remove</button>
+            </span>
           </div>
         `
       )
@@ -1102,7 +1108,7 @@ function removeCluster() {
 }
 
 function addPaymentMethod() {
-  const name = normalizeTextInput(prompt("Payment method name", "Credit Card - ") || "");
+  const name = normalizeTextInput(prompt("Payment method name", "") || "");
   if (!name) return;
   if (getPaymentMethods().some((method) => method.toLowerCase() === name.toLowerCase())) {
     alert("That payment method already exists.");
@@ -1113,9 +1119,9 @@ function addPaymentMethod() {
   const id = uniquePaymentId(name, isCreditCard ? state.creditCards : state.paymentMethods);
   if (isCreditCard) {
     const cutoffDay = clampCutoffDay(prompt("Credit card cutoff day", "25") || "25");
-    state.creditCards.push({ id, name, method: name, cutoffDay, locked: false });
+    state.creditCards.push({ id, name, method: name, cutoffDay });
   } else {
-    state.paymentMethods.push({ id, name, locked: false });
+    state.paymentMethods.push({ id, name });
   }
 
   selectedPaymentMethod = name;
@@ -1130,12 +1136,53 @@ function handlePaymentMethodAction(event) {
     removePaymentMethod(button.dataset.paymentId);
   } else if (button.dataset.paymentAction === "remove-card") {
     removeCreditCardMethod(button.dataset.paymentId);
+  } else if (button.dataset.paymentAction === "edit-method") {
+    editPaymentMethod(button.dataset.paymentId);
+  } else if (button.dataset.paymentAction === "edit-card") {
+    editCreditCardMethod(button.dataset.paymentId);
   }
+}
+
+function editPaymentMethod(methodId) {
+  const method = state.paymentMethods.find((item) => item.id === methodId);
+  if (!method) return;
+  const previousName = method.name;
+  const name = normalizeTextInput(prompt("Payment method name", previousName) || "");
+  if (!name || name === previousName) return;
+  if (getPaymentMethods().some((item) => item !== previousName && item.toLowerCase() === name.toLowerCase())) {
+    alert("That payment method already exists.");
+    return;
+  }
+  method.name = name;
+  renameTransactionPaymentMethod(previousName, name);
+  if (selectedPaymentMethod === previousName) selectedPaymentMethod = name;
+  persist();
+  render();
+}
+
+function editCreditCardMethod(cardId) {
+  const card = state.creditCards.find((item) => item.id === cardId);
+  if (!card) return;
+  const previousMethod = card.method;
+  const method = normalizeTextInput(prompt("Payment method name", previousMethod) || "");
+  if (!method) return;
+  if (getPaymentMethods().some((item) => item !== previousMethod && item.toLowerCase() === method.toLowerCase())) {
+    alert("That payment method already exists.");
+    return;
+  }
+  const cutoffDay = clampCutoffDay(prompt("Credit card cutoff day", String(card.cutoffDay)) || String(card.cutoffDay));
+  card.method = method;
+  card.name = method.replace(/^Credit Card\s*-\s*/i, "") || method;
+  card.cutoffDay = cutoffDay;
+  renameTransactionPaymentMethod(previousMethod, method);
+  if (selectedPaymentMethod === previousMethod) selectedPaymentMethod = method;
+  persist();
+  render();
 }
 
 function removePaymentMethod(methodId) {
   const method = state.paymentMethods.find((item) => item.id === methodId);
-  if (!method || method.locked) return;
+  if (!method) return;
   if (!confirm(`Remove ${method.name}? Existing transactions will keep their saved label.`)) return;
   state.paymentMethods = state.paymentMethods.filter((item) => item.id !== methodId);
   if (selectedPaymentMethod === method.name) selectedPaymentMethod = getFallbackPaymentMethod();
@@ -1145,12 +1192,18 @@ function removePaymentMethod(methodId) {
 
 function removeCreditCardMethod(cardId) {
   const card = state.creditCards.find((item) => item.id === cardId);
-  if (!card || card.locked) return;
+  if (!card) return;
   if (!confirm(`Remove ${card.method}? Existing transactions will keep their saved label.`)) return;
   state.creditCards = state.creditCards.filter((item) => item.id !== cardId);
   if (selectedPaymentMethod === card.method) selectedPaymentMethod = getFallbackPaymentMethod();
   persist();
   render();
+}
+
+function renameTransactionPaymentMethod(previousName, nextName) {
+  state.transactions.forEach((transaction) => {
+    if (transaction.paymentMethod === previousName) transaction.paymentMethod = nextName;
+  });
 }
 
 function addAsset() {
@@ -1456,8 +1509,7 @@ function normalizeCreditCards(cards) {
                 id: card.id || uniquePaymentId(method, defaults),
                 name: normalizeTextInput(card.name || method),
                 method,
-                cutoffDay: clampCutoffDay(card.cutoffDay || 25),
-                locked: false
+                cutoffDay: clampCutoffDay(card.cutoffDay || 25)
               }
             : null;
         })
@@ -1482,8 +1534,7 @@ function normalizePaymentMethods(methods) {
         .filter((method) => method?.name && !DEFAULT_PAYMENT_METHODS.some((defaultMethod) => defaultMethod.id === method.id || defaultMethod.name.toLowerCase() === method.name.toLowerCase()))
         .map((method) => ({
           id: method.id || uniquePaymentId(method.name, defaults),
-          name: normalizeTextInput(method.name),
-          locked: false
+          name: normalizeTextInput(method.name)
         }))
     : [];
   return [...defaults, ...extras];

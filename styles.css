@@ -1095,6 +1095,12 @@ main {
   gap: 2px;
 }
 
+.settings-row-actions {
+  display: flex !important;
+  flex: 0 0 auto;
+  gap: 6px;
+}
+
 .settings-row small {
   color: var(--muted);
   font-size: 12px;
