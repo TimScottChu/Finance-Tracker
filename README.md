@@ -28,7 +28,7 @@ Data is stored locally in the browser/PWA storage. There is no login and no host
 
 ## Main Features
 
-- Summary dashboard with income, expenses, budget bars, calendar, and selected-date transactions
+- Summary dashboard with income, expenses, budget bars, recurring totals, calendar, and selected-date transactions
 - Quick Add flow for expenses and income
 - Budget groups with category budgets
 - Budget bars that show spent progress, remaining amount, and tap-to-view category transactions
@@ -114,14 +114,16 @@ On **Budget**, use **Recurring** for subscriptions and monthly payables such as 
 Each recurring item has:
 
 - amount
-- budget group
+- budget group, assigned from the active Budget group
 - category
 - payment method
 - credit day
 
-Recurring items show on the Summary calendar as expected expenses. They do not automatically create actual spending transactions, so bank-statement checking stays clean.
+Recurring items show on the Summary calendar as expected expenses. Summary also shows a recurring total with budget-group breakdown when tapped. They do not automatically create actual spending transactions, so bank-statement checking stays clean.
 
 Tap the recurring total to show or hide the breakdown. In Edit mode, tap one recurring item first before editing its fields.
+
+Swipe left/right on the Summary budget panel or Budget screen to move between budget groups. Swipe left/right on the calendar panel to change months.
 
 ### Track Assets
 

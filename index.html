@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#10bfa8" />
     <title>PHP Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=25" />
+    <link rel="stylesheet" href="styles.css?v=26" />
   </head>
   <body>
     <div class="app-shell">
@@ -42,7 +42,7 @@
             </article>
           </div>
 
-          <section class="panel">
+          <section class="panel" id="summary-budget-panel">
             <div class="section-heading">
               <h2>Budget</h2>
               <div class="calendar-controls">
@@ -59,12 +59,23 @@
 
           <section class="panel">
             <div class="section-heading">
+              <h2>Recurring</h2>
+            </div>
+            <button class="recurring-summary" id="summary-recurring-toggle" type="button" aria-label="Show recurring group totals">
+              <span>Expected monthly total</span>
+              <strong id="summary-recurring-total">PHP 0.00</strong>
+            </button>
+            <div class="recurring-list hidden" id="summary-recurring-list"></div>
+          </section>
+
+          <section class="panel">
+            <div class="section-heading">
               <h2>Credit cards</h2>
             </div>
             <div class="payment-method-list" id="payment-method-list"></div>
           </section>
 
-          <section class="panel">
+          <section class="panel" id="calendar-panel">
             <div class="section-heading">
               <h2>Calendar view</h2>
               <div class="calendar-controls">
@@ -196,10 +207,10 @@
               <h2>Recurring</h2>
               <button class="text-button" id="toggle-recurring-edit" type="button">Edit</button>
             </div>
-            <div class="recurring-summary" id="recurring-summary" role="button" tabindex="0" aria-label="Show recurring details">
+            <button class="recurring-summary" id="recurring-summary" type="button" aria-label="Show recurring details">
               <span>Expected monthly total</span>
               <strong id="recurring-total">PHP 0.00</strong>
-            </div>
+            </button>
             <div class="recurring-list" id="recurring-list"></div>
             <button class="secondary-button hidden" id="add-recurring" type="button">Add recurring expense</button>
           </section>
@@ -224,7 +235,7 @@
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v25</p>
+          <p class="app-version">App version v26</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
             <button class="export-tile export-wide" id="export-assets-csv" type="button">Export assets CSV</button>
@@ -371,6 +382,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=25"></script>
+    <script src="app.js?v=26"></script>
   </body>
 </html>

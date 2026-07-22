@@ -67,6 +67,7 @@ let categoryEditMode = false;
 let paymentMethodsEditMode = false;
 let recurringEditMode = false;
 let recurringDetailsOpen = false;
+let summaryRecurringOpen = false;
 let editingRecurringId = "";
 let transactionEditMode = false;
 let selectedDateDetailsOpen = false;
@@ -124,6 +125,10 @@ const els = {
   recurringList: document.querySelector("#recurring-list"),
   toggleRecurringEdit: document.querySelector("#toggle-recurring-edit"),
   addRecurring: document.querySelector("#add-recurring"),
+  summaryBudgetPanel: document.querySelector("#summary-budget-panel"),
+  summaryRecurringToggle: document.querySelector("#summary-recurring-toggle"),
+  summaryRecurringTotal: document.querySelector("#summary-recurring-total"),
+  summaryRecurringList: document.querySelector("#summary-recurring-list"),
   summaryClusterPrev: document.querySelector("#summary-cluster-prev"),
   summaryClusterNext: document.querySelector("#summary-cluster-next"),
   summaryClusterName: document.querySelector("#summary-cluster-name"),
@@ -131,6 +136,7 @@ const els = {
   homeBudgetBars: document.querySelector("#home-budget-bars"),
   paymentMethodList: document.querySelector("#payment-method-list"),
   calendarGrid: document.querySelector("#calendar-grid"),
+  calendarPanel: document.querySelector("#calendar-panel"),
   selectedDatePanel: document.querySelector("#selected-date-panel"),
   selectedDateTitle: document.querySelector("#selected-date-title"),
   selectedDateTotal: document.querySelector("#selected-date-total"),
@@ -172,6 +178,7 @@ const els = {
   addCluster: document.querySelector("#add-cluster"),
   removeCluster: document.querySelector("#remove-cluster"),
   budgetList: document.querySelector("#budget-list"),
+  budgetScreen: document.querySelector("#budget-screen"),
   toggleCategoryEdit: document.querySelector("#toggle-category-edit"),
   addCategory: document.querySelector("#add-category"),
   assetsList: document.querySelector("#assets-list"),
@@ -218,6 +225,10 @@ function bindEvents() {
   els.summaryClusterNext.addEventListener("click", () => changeCluster(1));
   els.budgetClusterPrev.addEventListener("click", () => changeCluster(-1));
   els.budgetClusterNext.addEventListener("click", () => changeCluster(1));
+  els.summaryRecurringToggle.addEventListener("click", () => {
+    summaryRecurringOpen = !summaryRecurringOpen;
+    renderSummaryRecurring();
+  });
   els.openHistory.addEventListener("click", () => showScreen("history-screen"));
   els.backSummary.addEventListener("click", () => showScreen("summary-screen"));
   els.historyPrev.addEventListener("click", () => {
@@ -286,16 +297,12 @@ function bindEvents() {
     recurringDetailsOpen = !recurringDetailsOpen;
     renderRecurringExpenses();
   });
-  els.recurringSummary.addEventListener("keydown", (event) => {
-    if (event.key !== "Enter" && event.key !== " ") return;
-    event.preventDefault();
-    if (recurringEditMode) return;
-    recurringDetailsOpen = !recurringDetailsOpen;
-    renderRecurringExpenses();
-  });
   els.addRecurring.addEventListener("click", addRecurringExpense);
   els.recurringList.addEventListener("click", handleRecurringAction);
   els.recurringList.addEventListener("change", handleRecurringChange);
+  bindSwipe(els.summaryBudgetPanel, () => changeCluster(1), () => changeCluster(-1));
+  bindSwipe(els.budgetScreen, () => changeCluster(1), () => changeCluster(-1));
+  bindSwipe(els.calendarPanel, () => changeMonth(1), () => changeMonth(-1));
   els.closeCardDetail.addEventListener("click", closeCardDetail);
   els.cardDetailModal.addEventListener("click", (event) => {
     if (event.target === els.cardDetailModal) closeCardDetail();
@@ -420,6 +427,40 @@ function changeCluster(offset) {
   renderBudget();
 }
 
+function bindSwipe(element, onSwipeLeft, onSwipeRight) {
+  if (!element) return;
+  let startX = 0;
+  let startY = 0;
+  let tracking = false;
+  element.addEventListener(
+    "touchstart",
+    (event) => {
+      if (event.touches.length !== 1 || event.target.closest("button, input, select, textarea, label")) return;
+      startX = event.touches[0].clientX;
+      startY = event.touches[0].clientY;
+      tracking = true;
+    },
+    { passive: true }
+  );
+  element.addEventListener(
+    "touchend",
+    (event) => {
+      if (!tracking) return;
+      tracking = false;
+      const touch = event.changedTouches[0];
+      const deltaX = touch.clientX - startX;
+      const deltaY = touch.clientY - startY;
+      if (Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY) * 1.4) return;
+      if (deltaX < 0) {
+        onSwipeLeft();
+      } else {
+        onSwipeRight();
+      }
+    },
+    { passive: true }
+  );
+}
+
 function render() {
   ensureMonthBudget(currentMonth);
   els.monthLabel.textContent = monthLong(currentMonth);
@@ -440,6 +481,7 @@ function renderHome() {
     button.setAttribute("aria-label", summaryValuesVisible ? "Hide summary values" : "Show summary values");
   });
   renderHomeBudgetBars();
+  renderSummaryRecurring();
   renderPaymentMethodTotals();
 
   renderCalendar();
@@ -499,6 +541,38 @@ function renderHomeBudgetBars() {
       `;
     })
     .join("");
+}
+
+function renderSummaryRecurring() {
+  const clusters = getBudgetClusters(state.budgets[currentMonth]);
+  const rows = clusters.map((cluster) => {
+    const items = getRecurringExpensesForCluster(cluster.id);
+    return {
+      cluster,
+      count: items.length,
+      total: items.reduce((sum, item) => sum + item.amount, 0)
+    };
+  });
+  const total = rows.reduce((sum, row) => sum + row.total, 0);
+  els.summaryRecurringTotal.textContent = formatMoney(total);
+  els.summaryRecurringToggle.setAttribute("aria-label", `${summaryRecurringOpen ? "Hide" : "Show"} recurring group totals`);
+  els.summaryRecurringList.classList.toggle("hidden", !summaryRecurringOpen);
+  els.summaryRecurringList.innerHTML = rows.some((row) => row.total)
+    ? rows
+        .filter((row) => row.total)
+        .map(
+          (row) => `
+            <div class="recurring-row compact">
+              <span>
+                <strong>${escapeHtml(row.cluster.name)}</strong>
+                <small>${row.count} recurring item${row.count === 1 ? "" : "s"}</small>
+              </span>
+              <strong>${formatMoney(row.total)}</strong>
+            </div>
+          `
+        )
+        .join("")
+    : `<p class="empty">No recurring expenses yet.</p>`;
 }
 
 function renderCalendar() {
@@ -666,14 +740,6 @@ function renderRecurringExpenses() {
                       <input inputmode="decimal" value="${item.amount || ""}" data-recurring-field="amount" data-recurring-id="${item.id}" aria-label="${escapeAttribute(item.name)} amount" />
                     </div>
                     <label>
-                      <span>Group</span>
-                      <select data-recurring-field="clusterId" data-recurring-id="${item.id}">
-                        ${getBudgetClusters(state.budgets[currentMonth])
-                          .map((option) => `<option value="${option.id}" ${option.id === cluster.id ? "selected" : ""}>${escapeHtml(option.name)}</option>`)
-                          .join("")}
-                      </select>
-                    </label>
-                    <label>
                       <span>Category</span>
                       <select data-recurring-field="categoryId" data-recurring-id="${item.id}">
                         ${categoryOptions}
@@ -728,6 +794,7 @@ function addRecurringExpense() {
   editingRecurringId = item.id;
   persist();
   renderRecurringExpenses();
+  renderSummaryRecurring();
   renderCalendar();
   renderSelectedDateTransactions();
 }
@@ -754,6 +821,7 @@ function removeRecurringExpense(expenseId) {
   if (editingRecurringId === expenseId) editingRecurringId = "";
   persist();
   renderRecurringExpenses();
+  renderSummaryRecurring();
   renderCalendar();
   renderSelectedDateTransactions();
 }
@@ -767,12 +835,6 @@ function handleRecurringChange(event) {
     expense.amount = parseAmount(field.value);
   } else if (field.dataset.recurringField === "dueDay") {
     expense.dueDay = clampCutoffDay(field.value);
-  } else if (field.dataset.recurringField === "clusterId") {
-    expense.clusterId = field.value;
-    const cluster = getRecurringCluster(expense);
-    if (!getClusterCategoryIds(cluster).includes(expense.categoryId)) {
-      expense.categoryId = getClusterCategoryIds(cluster)[0] || expense.categoryId;
-    }
   } else if (field.dataset.recurringField === "categoryId") {
     expense.categoryId = field.value;
   } else if (field.dataset.recurringField === "paymentMethod") {
@@ -782,6 +844,7 @@ function handleRecurringChange(event) {
   }
   persist();
   renderRecurringExpenses();
+  renderSummaryRecurring();
   renderCalendar();
   renderSelectedDateTransactions();
 }
