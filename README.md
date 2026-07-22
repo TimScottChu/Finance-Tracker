@@ -109,7 +109,7 @@ Tap a Summary budget category to see its monthly total and transaction breakdown
 
 ### Track Recurring Expenses
 
-On **Budget**, use **Recurring** for subscriptions and monthly payables such as Spotify or other repeating bills.
+On **Budget**, use **Recurring** for subscriptions and monthly payables such as Spotify or other repeating bills. Recurring items are shown only for the active budget group.
 
 Each recurring item has:
 
@@ -120,6 +120,8 @@ Each recurring item has:
 - credit day
 
 Recurring items show on the Summary calendar as expected expenses. They do not automatically create actual spending transactions, so bank-statement checking stays clean.
+
+Tap the recurring total to show or hide the breakdown. In Edit mode, tap one recurring item first before editing its fields.
 
 ### Track Assets
 

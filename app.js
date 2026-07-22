@@ -66,6 +66,8 @@ let assetsEditMode = false;
 let categoryEditMode = false;
 let paymentMethodsEditMode = false;
 let recurringEditMode = false;
+let recurringDetailsOpen = false;
+let editingRecurringId = "";
 let transactionEditMode = false;
 let selectedDateDetailsOpen = false;
 let editingTransactionId = "";
@@ -117,6 +119,7 @@ const els = {
   historySpent: document.querySelector("#history-spent"),
   historyDifference: document.querySelector("#history-difference"),
   historyList: document.querySelector("#history-list"),
+  recurringSummary: document.querySelector("#recurring-summary"),
   recurringTotal: document.querySelector("#recurring-total"),
   recurringList: document.querySelector("#recurring-list"),
   toggleRecurringEdit: document.querySelector("#toggle-recurring-edit"),
@@ -274,6 +277,20 @@ function bindEvents() {
   });
   els.toggleRecurringEdit.addEventListener("click", () => {
     recurringEditMode = !recurringEditMode;
+    recurringDetailsOpen = recurringEditMode || recurringDetailsOpen;
+    editingRecurringId = "";
+    renderRecurringExpenses();
+  });
+  els.recurringSummary.addEventListener("click", () => {
+    if (recurringEditMode) return;
+    recurringDetailsOpen = !recurringDetailsOpen;
+    renderRecurringExpenses();
+  });
+  els.recurringSummary.addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    event.preventDefault();
+    if (recurringEditMode) return;
+    recurringDetailsOpen = !recurringDetailsOpen;
     renderRecurringExpenses();
   });
   els.addRecurring.addEventListener("click", addRecurringExpense);
@@ -615,12 +632,19 @@ function renderPaymentMethodTotals() {
 }
 
 function renderRecurringExpenses() {
-  const total = state.recurringExpenses.reduce((sum, item) => sum + item.amount, 0);
+  const activeCluster = getActiveCluster(state.budgets[currentMonth]);
+  const items = getRecurringExpensesForCluster(activeCluster.id);
+  const total = items.reduce((sum, item) => sum + item.amount, 0);
   els.recurringTotal.textContent = formatMoney(total);
   els.toggleRecurringEdit.textContent = recurringEditMode ? "Done" : "Edit";
   els.addRecurring.classList.toggle("hidden", !recurringEditMode);
-  els.recurringList.innerHTML = state.recurringExpenses.length
-    ? state.recurringExpenses
+  els.recurringSummary.setAttribute("aria-label", `${recurringDetailsOpen ? "Hide" : "Show"} recurring details for ${activeCluster.name}`);
+  if (!recurringEditMode && !recurringDetailsOpen) {
+    els.recurringList.innerHTML = "";
+    return;
+  }
+  els.recurringList.innerHTML = items.length
+    ? items
         .map((item) => {
           const category = findCategory("expense", item.categoryId);
           const cluster = getRecurringCluster(item);
@@ -630,10 +654,11 @@ function renderRecurringExpenses() {
               return `<option value="${categoryId}" ${categoryId === item.categoryId ? "selected" : ""}>${escapeHtml(optionCategory?.name || "Uncategorized")}</option>`;
             })
             .join("");
+          const isEditing = recurringEditMode && editingRecurringId === item.id;
           return `
-            <div class="recurring-row ${recurringEditMode ? "editing" : ""}">
+            <div class="recurring-row ${isEditing ? "editing" : recurringEditMode ? "selectable" : ""} ${editingRecurringId === item.id ? "selected" : ""}" ${recurringEditMode && !isEditing ? `data-recurring-select="${item.id}"` : ""}>
               ${
-                recurringEditMode
+                isEditing
                   ? `
                     <input value="${escapeAttribute(item.name)}" data-recurring-field="name" data-recurring-id="${item.id}" aria-label="Recurring name" />
                     <div class="money-input compact">
@@ -673,7 +698,7 @@ function renderRecurringExpenses() {
                   : `
                     <span>
                       <strong>${escapeHtml(item.name)}</strong>
-                      <small>Day ${item.dueDay} - ${escapeHtml(cluster.name)} / ${escapeHtml(category?.name || "Uncategorized")} - ${escapeHtml(item.paymentMethod)}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+                      <small>Day ${item.dueDay} - ${escapeHtml(category?.name || "Uncategorized")} - ${escapeHtml(item.paymentMethod)}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
                     </span>
                     <strong>${formatMoney(item.amount)}</strong>
                   `
@@ -682,13 +707,13 @@ function renderRecurringExpenses() {
           `;
         })
         .join("")
-    : `<p class="empty">No recurring expenses yet.</p>`;
+    : `<p class="empty">No recurring expenses for ${escapeHtml(activeCluster.name)} yet.</p>`;
 }
 
 function addRecurringExpense() {
   const cluster = getActiveCluster(state.budgets[currentMonth]);
   const categoryId = getClusterCategoryIds(cluster)[0] || state.categories.expense[0]?.id || "";
-  state.recurringExpenses.push({
+  const item = {
     id: `recurring-${Date.now()}`,
     name: "New recurring",
     amount: 0,
@@ -697,7 +722,10 @@ function addRecurringExpense() {
     paymentMethod: getFallbackPaymentMethod(),
     dueDay: 1,
     note: ""
-  });
+  };
+  state.recurringExpenses.push(item);
+  recurringDetailsOpen = true;
+  editingRecurringId = item.id;
   persist();
   renderRecurringExpenses();
   renderCalendar();
@@ -705,6 +733,12 @@ function addRecurringExpense() {
 }
 
 function handleRecurringAction(event) {
+  const row = event.target.closest("[data-recurring-select]");
+  if (row && recurringEditMode) {
+    editingRecurringId = row.dataset.recurringSelect;
+    renderRecurringExpenses();
+    return;
+  }
   const button = event.target.closest("[data-recurring-action]");
   if (!button || !recurringEditMode) return;
   if (button.dataset.recurringAction === "remove") {
@@ -717,6 +751,7 @@ function removeRecurringExpense(expenseId) {
   if (!expense) return;
   if (!confirm(`Remove ${expense.name}?`)) return;
   state.recurringExpenses = state.recurringExpenses.filter((item) => item.id !== expenseId);
+  if (editingRecurringId === expenseId) editingRecurringId = "";
   persist();
   renderRecurringExpenses();
   renderCalendar();
@@ -1904,6 +1939,12 @@ function getRecurringCluster(item, monthKey = currentMonth) {
   const budget = state.budgets[monthKey] || state.budgets[currentMonth];
   const clusters = getBudgetClusters(budget);
   return clusters.find((cluster) => cluster.id === item.clusterId) || clusters[0];
+}
+
+function getRecurringExpensesForCluster(clusterId) {
+  return state.recurringExpenses
+    .filter((item) => item.clusterId === clusterId)
+    .sort((a, b) => a.dueDay - b.dueDay || a.name.localeCompare(b.name));
 }
 
 function getRecurringDate(monthKey, item) {

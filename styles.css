@@ -361,6 +361,7 @@ main {
   gap: 12px;
   margin-bottom: 10px;
   color: var(--muted);
+  cursor: pointer;
 }
 
 .recurring-summary strong {
@@ -396,6 +397,17 @@ main {
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
+}
+
+.recurring-row.selectable {
+  cursor: pointer;
+}
+
+.recurring-row.selectable:hover,
+.recurring-row.selected {
+  border-radius: 8px;
+  padding-inline: 8px;
+  background: var(--mint-soft);
 }
 
 .recurring-row.editing {
