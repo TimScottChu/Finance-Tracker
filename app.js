@@ -79,6 +79,7 @@ let expandedSummaryCategoryId = "";
 let calculatorTarget = null;
 let calculatorExpression = "";
 let lastCalculatorOpenAt = 0;
+let lastSwipeAt = 0;
 let activeClusterIndex = 0;
 let selectedEntryClusterId = "";
 let selectedPaymentMethod = getFallbackPaymentMethod();
@@ -252,12 +253,14 @@ function bindEvents() {
     });
   });
   els.homeBudgetBars.addEventListener("click", (event) => {
+    if (wasRecentSwipe()) return;
     const row = event.target.closest("[data-summary-category]");
     if (!row) return;
     expandedSummaryCategoryId = expandedSummaryCategoryId === row.dataset.summaryCategory ? "" : row.dataset.summaryCategory;
     renderHomeBudgetBars();
   });
   els.calendarGrid.addEventListener("click", (event) => {
+    if (wasRecentSwipe()) return;
     const button = event.target.closest("[data-date]");
     if (!button) return;
     if (selectedDate === button.dataset.date && selectedDateDetailsOpen) {
@@ -437,7 +440,7 @@ function bindSwipe(element, onSwipeLeft, onSwipeRight) {
   element.addEventListener(
     "touchstart",
     (event) => {
-      if (event.touches.length !== 1 || event.target.closest("button, input, select, textarea, label")) return;
+      if (event.touches.length !== 1 || event.target.closest("input, select, textarea, label")) return;
       startX = event.touches[0].clientX;
       startY = event.touches[0].clientY;
       tracking = true;
@@ -453,6 +456,7 @@ function bindSwipe(element, onSwipeLeft, onSwipeRight) {
       const deltaX = touch.clientX - startX;
       const deltaY = touch.clientY - startY;
       if (Math.abs(deltaX) < 60 || Math.abs(deltaX) < Math.abs(deltaY) * 1.4) return;
+      lastSwipeAt = Date.now();
       if (deltaX < 0) {
         onSwipeLeft();
       } else {
@@ -461,6 +465,19 @@ function bindSwipe(element, onSwipeLeft, onSwipeRight) {
     },
     { passive: true }
   );
+  element.addEventListener(
+    "click",
+    (event) => {
+      if (!wasRecentSwipe()) return;
+      event.preventDefault();
+      event.stopPropagation();
+    },
+    true
+  );
+}
+
+function wasRecentSwipe() {
+  return Date.now() - lastSwipeAt < 450;
 }
 
 function render() {

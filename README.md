@@ -124,7 +124,7 @@ Recurring items show on the Summary calendar as expected expenses. Summary also 
 
 Tap the recurring total to show or hide the breakdown. In Edit mode, tap one recurring item first before editing its fields.
 
-Swipe left/right on the Summary budget panel or Budget screen to move between budget groups. Swipe left/right on the calendar panel to change months.
+Swipe left/right anywhere on the Summary budget panel or Budget screen to move between budget groups. Swipe left/right anywhere on the calendar panel to change months.
 
 ### Track Assets
 
