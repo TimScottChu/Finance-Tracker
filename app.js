@@ -43,6 +43,8 @@ const DEFAULT_ASSETS = [
   { id: "bpi-uitf", date: "2026-03-09", account: "BPI UITF", balance: 2108519.19 }
 ];
 
+const DEFAULT_RECURRING_EXPENSES = [];
+
 const DEFAULT_PAYMENT_METHODS = [
   { id: "cash", name: "Cash" },
   { id: "digital-wallet", name: "Digital Wallet" }
@@ -57,11 +59,13 @@ let state = loadState();
 let currentMonth = getMonthKey(new Date());
 let selectedDate = toDateInputValue(new Date());
 let historyYear = new Date().getFullYear();
+let expandedHistoryMonth = "";
 let entryType = "expense";
 let selectedCategory = state.categories.expense[0].id;
 let assetsEditMode = false;
 let categoryEditMode = false;
 let paymentMethodsEditMode = false;
+let recurringEditMode = false;
 let transactionEditMode = false;
 let selectedDateDetailsOpen = false;
 let editingTransactionId = "";
@@ -113,6 +117,10 @@ const els = {
   historySpent: document.querySelector("#history-spent"),
   historyDifference: document.querySelector("#history-difference"),
   historyList: document.querySelector("#history-list"),
+  recurringTotal: document.querySelector("#recurring-total"),
+  recurringList: document.querySelector("#recurring-list"),
+  toggleRecurringEdit: document.querySelector("#toggle-recurring-edit"),
+  addRecurring: document.querySelector("#add-recurring"),
   summaryClusterPrev: document.querySelector("#summary-cluster-prev"),
   summaryClusterNext: document.querySelector("#summary-cluster-next"),
   summaryClusterName: document.querySelector("#summary-cluster-name"),
@@ -217,6 +225,12 @@ function bindEvents() {
     historyYear += 1;
     renderHistory();
   });
+  els.historyList.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-history-month]");
+    if (!row) return;
+    expandedHistoryMonth = expandedHistoryMonth === row.dataset.historyMonth ? "" : row.dataset.historyMonth;
+    renderHistory();
+  });
   els.privacyToggles.forEach((button) => {
     button.addEventListener("click", () => {
       summaryValuesVisible = !summaryValuesVisible;
@@ -258,6 +272,12 @@ function bindEvents() {
     if (!button) return;
     openCardDetail(button.dataset.cardDetail);
   });
+  els.toggleRecurringEdit.addEventListener("click", () => {
+    recurringEditMode = !recurringEditMode;
+    renderRecurringExpenses();
+  });
+  els.addRecurring.addEventListener("click", addRecurringExpense);
+  els.recurringList.addEventListener("click", handleRecurringAction);
   els.closeCardDetail.addEventListener("click", closeCardDetail);
   els.cardDetailModal.addEventListener("click", (event) => {
     if (event.target === els.cardDetailModal) closeCardDetail();
@@ -403,6 +423,7 @@ function renderHome() {
   });
   renderHomeBudgetBars();
   renderPaymentMethodTotals();
+  renderRecurringExpenses();
 
   renderCalendar();
   renderSelectedDateTransactions();
@@ -424,6 +445,7 @@ function renderHomeBudgetBars() {
       const capped = Math.min(100, Math.max(0, percent));
       const statusClass = getBudgetStatusClass(percent);
       const isExpanded = expandedSummaryCategoryId === categoryId;
+      const transactions = isExpanded ? getCategoryTransactions(currentMonth, categoryId, cluster.id) : [];
       return `
         <button class="home-budget-row ${isExpanded ? "expanded" : ""}" type="button" data-summary-category="${categoryId}">
           <div class="home-budget-labels">
@@ -435,7 +457,27 @@ function renderHomeBudgetBars() {
           <div class="progress-track compact">
             <div class="progress-fill ${statusClass}" style="--width:${capped}%"></div>
           </div>
-          ${isExpanded ? `<div class="summary-category-total">Month total <strong>${formatMoney(spent)}</strong></div>` : ""}
+          ${
+            isExpanded
+              ? `<div class="summary-category-detail">
+                  <div class="summary-category-total">Month total <strong>${formatMoney(spent)}</strong></div>
+                  ${
+                    transactions.length
+                      ? transactions
+                          .map(
+                            (item) => `
+                              <span>
+                                <small>${formatShortDate(item.date)} ${item.time}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+                                <strong>${formatMoney(item.amount)}</strong>
+                              </span>
+                            `
+                          )
+                          .join("")
+                      : `<small>No spending yet.</small>`
+                  }
+                </div>`
+              : ""
+          }
         </button>
       `;
     })
@@ -560,6 +602,110 @@ function renderPaymentMethodTotals() {
       `;
     })
     .join("");
+}
+
+function renderRecurringExpenses() {
+  const total = state.recurringExpenses.reduce((sum, item) => sum + item.amount, 0);
+  els.recurringTotal.textContent = formatMoney(total);
+  els.toggleRecurringEdit.textContent = recurringEditMode ? "Done" : "Edit";
+  els.addRecurring.classList.toggle("hidden", !recurringEditMode);
+  els.recurringList.innerHTML = state.recurringExpenses.length
+    ? state.recurringExpenses
+        .map((item) => {
+          const category = findCategory("expense", item.categoryId);
+          return `
+            <div class="settings-row">
+              <span>
+                <strong>${escapeHtml(item.name)}</strong>
+                <small>Day ${item.dueDay} - ${escapeHtml(category?.name || "Uncategorized")} - ${escapeHtml(item.paymentMethod)}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+              </span>
+              ${
+                recurringEditMode
+                  ? `<span class="settings-row-actions">
+                      <button class="small-action-button" type="button" data-recurring-action="edit" data-recurring-id="${item.id}">Edit</button>
+                      <button class="small-action-button danger" type="button" data-recurring-action="remove" data-recurring-id="${item.id}">Remove</button>
+                    </span>`
+                  : `<strong>${formatMoney(item.amount)}</strong>`
+              }
+            </div>
+          `;
+        })
+        .join("")
+    : `<p class="empty">No recurring expenses yet.</p>`;
+}
+
+function addRecurringExpense() {
+  const expense = promptRecurringExpense();
+  if (!expense) return;
+  state.recurringExpenses.push(expense);
+  persist();
+  renderRecurringExpenses();
+}
+
+function handleRecurringAction(event) {
+  const button = event.target.closest("[data-recurring-action]");
+  if (!button || !recurringEditMode) return;
+  if (button.dataset.recurringAction === "edit") {
+    editRecurringExpense(button.dataset.recurringId);
+  } else if (button.dataset.recurringAction === "remove") {
+    removeRecurringExpense(button.dataset.recurringId);
+  }
+}
+
+function editRecurringExpense(expenseId) {
+  const expense = state.recurringExpenses.find((item) => item.id === expenseId);
+  if (!expense) return;
+  const updated = promptRecurringExpense(expense);
+  if (!updated) return;
+  Object.assign(expense, updated, { id: expense.id });
+  persist();
+  renderRecurringExpenses();
+}
+
+function removeRecurringExpense(expenseId) {
+  const expense = state.recurringExpenses.find((item) => item.id === expenseId);
+  if (!expense) return;
+  if (!confirm(`Remove ${expense.name}?`)) return;
+  state.recurringExpenses = state.recurringExpenses.filter((item) => item.id !== expenseId);
+  persist();
+  renderRecurringExpenses();
+}
+
+function promptRecurringExpense(existing = null) {
+  const name = normalizeTextInput(prompt("Recurring expense name", existing?.name || "") || "");
+  if (!name) return null;
+  const amount = parseAmount(prompt("Monthly amount", existing?.amount ? String(existing.amount) : "0") || "0");
+  const category = promptCategory(existing?.categoryId);
+  if (!category) return null;
+  const paymentMethod = promptPaymentMethod(existing?.paymentMethod);
+  if (!paymentMethod) return null;
+  const dueDay = clampCutoffDay(prompt("Due day of month", String(existing?.dueDay || 1)) || "1");
+  const note = normalizeTextInput(prompt("Note", existing?.note || "") || "");
+  return {
+    id: existing?.id || `${slugify(name)}-${Date.now()}`,
+    name,
+    amount,
+    categoryId: category.id,
+    paymentMethod,
+    dueDay,
+    note
+  };
+}
+
+function promptCategory(currentCategoryId = "") {
+  const categories = state.categories.expense;
+  const current = findCategory("expense", currentCategoryId) || categories[0];
+  const answer = normalizeTextInput(prompt(`Category (${categories.map((category) => category.name).join(", ")})`, current?.name || "") || "");
+  if (!answer) return null;
+  return categories.find((category) => category.name.toLowerCase() === answer.toLowerCase() || category.id === slugify(answer)) || current;
+}
+
+function promptPaymentMethod(currentMethod = "") {
+  const methods = getPaymentMethods();
+  const current = methods.includes(currentMethod) ? currentMethod : methods[0];
+  const answer = normalizeTextInput(prompt(`Payment method (${methods.join(", ")})`, current || "") || "");
+  if (!answer) return null;
+  return methods.find((method) => method.toLowerCase() === answer.toLowerCase()) || current;
 }
 
 function renderPaymentMethodsSettings() {
@@ -748,24 +894,36 @@ function renderHistory() {
   els.historyDifference.className = totalDifference < 0 ? "amount-negative" : "";
   els.historyList.innerHTML = monthRows
     .map((row) => {
-      const overspent = getMonthOverspending(row.monthKey);
+      const details = getMonthBudgetDetails(row.monthKey);
+      const overspent = details.filter((item) => item.status === "over");
+      const saved = details.filter((item) => item.status === "saved");
+      const isExpanded = expandedHistoryMonth === row.monthKey;
       return `
-      <article class="history-row">
-        <strong>${row.monthName}</strong>
+      <button class="history-row ${isExpanded ? "expanded" : ""}" type="button" data-history-month="${row.monthKey}">
+        <strong>${row.monthName}${overspent.length ? " *" : ""}</strong>
         <span>Budgeted ${formatMoney(row.budgeted)}</span>
         <span>Spent ${formatMoney(row.spent)}</span>
         <span class="${row.difference < 0 ? "amount-negative" : ""}">
           ${row.difference < 0 ? "Over " : "Left "}${formatMoney(Math.abs(row.difference))}
         </span>
         ${
-          overspent.length
+          isExpanded
             ? `<div class="history-insight">
-                <strong>Overspent</strong>
-                ${overspent.slice(0, 3).map((item) => `<span>${escapeHtml(item.name)} +${formatMoney(item.amount)}</span>`).join("")}
+                ${
+                  overspent.length
+                    ? `<strong>Overspent</strong>${overspent.map((item) => `<span>${escapeHtml(item.name)} +${formatMoney(item.amount)}</span>`).join("")}`
+                    : ""
+                }
+                ${
+                  saved.length
+                    ? `<strong class="saved">Saved</strong>${saved.map((item) => `<span class="saved">${escapeHtml(item.name)} ${formatMoney(item.amount)}</span>`).join("")}`
+                    : ""
+                }
+                ${!overspent.length && !saved.length ? `<span>No category budget details yet.</span>` : ""}
               </div>`
             : ""
         }
-      </article>
+      </button>
     `;
     })
     .join("");
@@ -1221,6 +1379,9 @@ function renameTransactionPaymentMethod(previousName, nextName) {
   state.transactions.forEach((transaction) => {
     if (transaction.paymentMethod === previousName) transaction.paymentMethod = nextName;
   });
+  state.recurringExpenses.forEach((expense) => {
+    if (expense.paymentMethod === previousName) expense.paymentMethod = nextName;
+  });
 }
 
 function addAsset() {
@@ -1434,13 +1595,23 @@ function getCategorySpent(monthKey, categoryId, clusterId = "") {
     .reduce((sum, item) => sum + item.amount, 0);
 }
 
+function getCategoryTransactions(monthKey, categoryId, clusterId = "") {
+  return state.transactions
+    .filter((item) => {
+      if (item.type !== "expense" || item.categoryId !== categoryId || !item.date.startsWith(monthKey)) return false;
+      if (!clusterId) return true;
+      return getTransactionClusterId(item) === clusterId;
+    })
+    .sort((a, b) => `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`));
+}
+
 function getClusterTotals(monthKey, cluster) {
   const budgeted = sumClusterBudget(cluster);
   const spent = getClusterCategoryIds(cluster).reduce((sum, categoryId) => sum + getCategorySpent(monthKey, categoryId, cluster.id), 0);
   return { budgeted, spent, remaining: budgeted - spent };
 }
 
-function getMonthOverspending(monthKey) {
+function getMonthBudgetDetails(monthKey) {
   const budget = state.budgets[monthKey];
   if (!budget) return [];
   return getBudgetClusters(budget)
@@ -1449,13 +1620,18 @@ function getMonthOverspending(monthKey) {
         const category = findCategory("expense", categoryId);
         const limit = cluster.categories[categoryId] ?? 0;
         const spent = getCategorySpent(monthKey, categoryId, cluster.id);
+        const difference = limit - spent;
         return {
           name: `${category?.name || "Uncategorized"} (${cluster.name})`,
-          amount: spent - limit
+          limit,
+          spent,
+          difference,
+          status: difference < 0 ? "over" : difference > 0 && limit > 0 ? "saved" : "even",
+          amount: Math.abs(difference)
         };
       })
     )
-    .filter((item) => item.amount > 0)
+    .filter((item) => item.status !== "even")
     .sort((a, b) => b.amount - a.amount);
 }
 
@@ -1501,6 +1677,7 @@ function normalizeState(input) {
     goals: input.goals || structuredClone(DEFAULT_GOALS),
     paymentMethods,
     creditCards,
+    recurringExpenses: normalizeRecurringExpenses(input.recurringExpenses, knownPaymentMethods, categories),
     assets: Array.isArray(input.assets) ? input.assets : structuredClone(DEFAULT_ASSETS),
     assetUpdatedAt: input.assetUpdatedAt || latestDateFromAssets(input.assets) || toDateInputValue(new Date())
   };
@@ -1555,6 +1732,29 @@ function normalizePaymentMethods(methods) {
         }))
     : [];
   return [...defaults, ...extras];
+}
+
+function normalizeRecurringExpenses(expenses, paymentMethods = getKnownPaymentMethods(), categories = DEFAULT_CATEGORIES) {
+  const source = Array.isArray(expenses) ? expenses : structuredClone(DEFAULT_RECURRING_EXPENSES);
+  const expenseCategories = categories.expense || DEFAULT_CATEGORIES.expense;
+  const fallbackCategory = expenseCategories[0]?.id || "personal";
+  const fallbackPayment = paymentMethods[0] || "Cash";
+  return source
+    .map((expense, index) => {
+      const name = normalizeTextInput(expense.name || "");
+      if (!name) return null;
+      const categoryExists = expenseCategories.some((category) => category.id === expense.categoryId);
+      return {
+        id: expense.id || `${slugify(name)}-${index}`,
+        name,
+        amount: parseAmount(expense.amount || 0),
+        categoryId: categoryExists ? expense.categoryId : fallbackCategory,
+        paymentMethod: paymentMethods.includes(expense.paymentMethod) ? expense.paymentMethod : fallbackPayment,
+        dueDay: clampCutoffDay(expense.dueDay || 1),
+        note: normalizeTextInput(expense.note || "")
+      };
+    })
+    .filter(Boolean);
 }
 
 function normalizeCategories(categories) {

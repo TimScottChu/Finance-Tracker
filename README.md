@@ -16,7 +16,7 @@ C:\Users\Admin\Documents\App Development\fin-tracker
 
 ## What The App Does
 
-This app helps track personal income, expenses, budgets, credit-card spending, assets, and monthly history.
+This app helps track personal income, expenses, budgets, credit-card spending, recurring monthly payables, assets, and monthly history.
 
 The main workflow is:
 
@@ -31,12 +31,13 @@ Data is stored locally in the browser/PWA storage. There is no login and no host
 - Summary dashboard with income, expenses, budget bars, calendar, and selected-date transactions
 - Quick Add flow for expenses and income
 - Budget groups with category budgets
-- Budget bars that show spent progress and remaining amount
+- Budget bars that show spent progress, remaining amount, and tap-to-view category transactions
 - Calendar view with daily expense totals
 - Editable transaction details
 - Payment methods: Cash, Credit Card - BPI, Credit Card - Metro, Digital Wallet
 - Credit-card statement view with cutoff day, statement period, and transaction details
-- History view with yearly month-by-month totals and overspending insights
+- History view with yearly month-by-month totals, overspending markers, and tap-to-view saved/overspent categories
+- Recurring expense tracker for subscriptions and monthly payables
 - Asset tracker with editable balances and reorder controls
 - Calculator-style amount input, such as `100+25`, `500-125`, or `1000/2`
 - Auto-capitalized notes, group names, category names, and asset names
@@ -104,6 +105,14 @@ Go to **Budget** to edit monthly category budgets. Use budget groups to separate
 
 The Summary budget bars are read-only and show spending progress.
 
+Tap a Summary budget category to see its monthly total and transaction breakdown.
+
+### Track Recurring Expenses
+
+On **Summary**, use **Recurring** for subscriptions and monthly payables such as Spotify or other repeating bills.
+
+Recurring items are reference entries only. They do not automatically create spending transactions.
+
 ### Track Assets
 
 Go to **Assets** to track account balances. Tap **Edit** to update balances, add/remove assets, or move assets up/down.
@@ -124,9 +133,8 @@ Go to **Settings**:
 - Verify credit-card totals against BPI and Metro statements
 - Confirm each card cutoff day is correct
 - Check whether the Add flow still feels clean with payment method included
-- Review whether History overspending insights are useful enough
-- Decide where recurring monthly payables should live
-- Decide whether recurring payables should generate reminders, expected entries, or just a checklist
+- Review whether History saved/overspent details are useful enough
+- Review whether the Recurring panel should stay as a reference list or later become reminders
 - Later: consider category prediction based on previous notes or merchants
 - Later: consider animation/polish once the workflow is stable
 - Later: consider APK conversion after the PWA feels right
