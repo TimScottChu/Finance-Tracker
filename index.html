@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#10bfa8" />
     <title>PHP Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=27" />
+    <link rel="stylesheet" href="styles.css?v=28" />
   </head>
   <body>
     <div class="app-shell">
@@ -58,11 +58,8 @@
           </section>
 
           <section class="panel">
-            <div class="section-heading">
-              <h2>Recurring</h2>
-            </div>
-            <button class="recurring-summary" id="summary-recurring-toggle" type="button" aria-label="Show recurring group totals">
-              <span>Expected monthly total</span>
+            <button class="recurring-summary summary-total-line" id="summary-recurring-toggle" type="button" aria-label="Show recurring group totals">
+              <strong>Recurring Total</strong>
               <strong id="summary-recurring-total">PHP 0.00</strong>
             </button>
             <div class="recurring-list hidden" id="summary-recurring-list"></div>
@@ -235,7 +232,7 @@
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v27</p>
+          <p class="app-version">App version v28</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
             <button class="export-tile export-wide" id="export-assets-csv" type="button">Export assets CSV</button>
@@ -382,6 +379,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=27"></script>
+    <script src="app.js?v=28"></script>
   </body>
 </html>

@@ -374,6 +374,10 @@ main {
   font-size: 18px;
 }
 
+.summary-total-line {
+  margin-bottom: 0;
+}
+
 .recurring-list {
   display: grid;
   gap: 10px;
