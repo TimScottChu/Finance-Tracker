@@ -278,6 +278,7 @@ function bindEvents() {
   });
   els.addRecurring.addEventListener("click", addRecurringExpense);
   els.recurringList.addEventListener("click", handleRecurringAction);
+  els.recurringList.addEventListener("change", handleRecurringChange);
   els.closeCardDetail.addEventListener("click", closeCardDetail);
   els.cardDetailModal.addEventListener("click", (event) => {
     if (event.target === els.cardDetailModal) closeCardDetail();
@@ -423,7 +424,6 @@ function renderHome() {
   });
   renderHomeBudgetBars();
   renderPaymentMethodTotals();
-  renderRecurringExpenses();
 
   renderCalendar();
   renderSelectedDateTransactions();
@@ -501,10 +501,12 @@ function renderCalendar() {
     const spent = state.transactions
       .filter((item) => item.date === dateKey && item.type === "expense")
       .reduce((sum, item) => sum + item.amount, 0);
+    const expected = getRecurringExpensesForDate(dateKey).reduce((sum, item) => sum + item.amount, 0);
     cells.push(`
       <button class="calendar-cell ${dateKey === todayKey ? "today" : ""} ${dateKey === selectedDate && selectedDateDetailsOpen ? "selected" : ""}" type="button" data-date="${dateKey}">
         <strong>${day}</strong>
         ${spent ? `<small>-${compactMoney(spent)}</small>` : ""}
+        ${expected ? `<small class="expected">Exp -${compactMoney(expected)}</small>` : ""}
       </button>
     `);
   }
@@ -521,14 +523,22 @@ function renderSelectedDateTransactions() {
   const expenseTotal = items
     .filter((item) => item.type === "expense")
     .reduce((sum, item) => sum + item.amount, 0);
+  const expectedItems = getRecurringExpensesForDate(selectedDate);
 
   els.selectedDateTitle.textContent = formatDisplayDate(selectedDate);
   els.selectedDateTotal.textContent = formatMoney(expenseTotal);
   els.toggleTransactionEdit.textContent = transactionEditMode ? "Done" : "Edit";
   els.toggleTransactionEdit.classList.toggle("hidden", !items.length);
-  els.selectedDateList.innerHTML = items.length
-    ? items.map(transactionTemplate).join("")
-    : `<p class="empty">No transactions on this date.</p>`;
+  const expectedMarkup = expectedItems.length
+    ? `
+      <div class="expected-list">
+        <strong>Expected recurring</strong>
+        ${expectedItems.map(expectedRecurringTemplate).join("")}
+      </div>
+    `
+    : "";
+  const transactionMarkup = items.length ? items.map(transactionTemplate).join("") : `<p class="empty">No transactions on this date.</p>`;
+  els.selectedDateList.innerHTML = `${expectedMarkup}${transactionMarkup}`;
 }
 
 function renderEntry() {
@@ -613,19 +623,60 @@ function renderRecurringExpenses() {
     ? state.recurringExpenses
         .map((item) => {
           const category = findCategory("expense", item.categoryId);
+          const cluster = getRecurringCluster(item);
+          const categoryOptions = getClusterCategoryIds(cluster)
+            .map((categoryId) => {
+              const optionCategory = findCategory("expense", categoryId);
+              return `<option value="${categoryId}" ${categoryId === item.categoryId ? "selected" : ""}>${escapeHtml(optionCategory?.name || "Uncategorized")}</option>`;
+            })
+            .join("");
           return `
-            <div class="settings-row">
-              <span>
-                <strong>${escapeHtml(item.name)}</strong>
-                <small>Day ${item.dueDay} - ${escapeHtml(category?.name || "Uncategorized")} - ${escapeHtml(item.paymentMethod)}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
-              </span>
+            <div class="recurring-row ${recurringEditMode ? "editing" : ""}">
               ${
                 recurringEditMode
-                  ? `<span class="settings-row-actions">
-                      <button class="small-action-button" type="button" data-recurring-action="edit" data-recurring-id="${item.id}">Edit</button>
-                      <button class="small-action-button danger" type="button" data-recurring-action="remove" data-recurring-id="${item.id}">Remove</button>
-                    </span>`
-                  : `<strong>${formatMoney(item.amount)}</strong>`
+                  ? `
+                    <input value="${escapeAttribute(item.name)}" data-recurring-field="name" data-recurring-id="${item.id}" aria-label="Recurring name" />
+                    <div class="money-input compact">
+                      <span>PHP</span>
+                      <input inputmode="decimal" value="${item.amount || ""}" data-recurring-field="amount" data-recurring-id="${item.id}" aria-label="${escapeAttribute(item.name)} amount" />
+                    </div>
+                    <label>
+                      <span>Group</span>
+                      <select data-recurring-field="clusterId" data-recurring-id="${item.id}">
+                        ${getBudgetClusters(state.budgets[currentMonth])
+                          .map((option) => `<option value="${option.id}" ${option.id === cluster.id ? "selected" : ""}>${escapeHtml(option.name)}</option>`)
+                          .join("")}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Category</span>
+                      <select data-recurring-field="categoryId" data-recurring-id="${item.id}">
+                        ${categoryOptions}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Payment</span>
+                      <select data-recurring-field="paymentMethod" data-recurring-id="${item.id}">
+                        ${getPaymentMethods().map((method) => `<option value="${escapeAttribute(method)}" ${method === item.paymentMethod ? "selected" : ""}>${escapeHtml(method)}</option>`).join("")}
+                      </select>
+                    </label>
+                    <label>
+                      <span>Credit day</span>
+                      <select data-recurring-field="dueDay" data-recurring-id="${item.id}">
+                        ${Array.from({ length: 31 }, (_, index) => index + 1)
+                          .map((day) => `<option value="${day}" ${day === item.dueDay ? "selected" : ""}>${day}</option>`)
+                          .join("")}
+                      </select>
+                    </label>
+                    <button class="remove-icon-button" type="button" data-recurring-action="remove" data-recurring-id="${item.id}" aria-label="Remove ${escapeAttribute(item.name)}"></button>
+                  `
+                  : `
+                    <span>
+                      <strong>${escapeHtml(item.name)}</strong>
+                      <small>Day ${item.dueDay} - ${escapeHtml(cluster.name)} / ${escapeHtml(category?.name || "Uncategorized")} - ${escapeHtml(item.paymentMethod)}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+                    </span>
+                    <strong>${formatMoney(item.amount)}</strong>
+                  `
               }
             </div>
           `;
@@ -635,31 +686,30 @@ function renderRecurringExpenses() {
 }
 
 function addRecurringExpense() {
-  const expense = promptRecurringExpense();
-  if (!expense) return;
-  state.recurringExpenses.push(expense);
+  const cluster = getActiveCluster(state.budgets[currentMonth]);
+  const categoryId = getClusterCategoryIds(cluster)[0] || state.categories.expense[0]?.id || "";
+  state.recurringExpenses.push({
+    id: `recurring-${Date.now()}`,
+    name: "New recurring",
+    amount: 0,
+    clusterId: cluster.id,
+    categoryId,
+    paymentMethod: getFallbackPaymentMethod(),
+    dueDay: 1,
+    note: ""
+  });
   persist();
   renderRecurringExpenses();
+  renderCalendar();
+  renderSelectedDateTransactions();
 }
 
 function handleRecurringAction(event) {
   const button = event.target.closest("[data-recurring-action]");
   if (!button || !recurringEditMode) return;
-  if (button.dataset.recurringAction === "edit") {
-    editRecurringExpense(button.dataset.recurringId);
-  } else if (button.dataset.recurringAction === "remove") {
+  if (button.dataset.recurringAction === "remove") {
     removeRecurringExpense(button.dataset.recurringId);
   }
-}
-
-function editRecurringExpense(expenseId) {
-  const expense = state.recurringExpenses.find((item) => item.id === expenseId);
-  if (!expense) return;
-  const updated = promptRecurringExpense(expense);
-  if (!updated) return;
-  Object.assign(expense, updated, { id: expense.id });
-  persist();
-  renderRecurringExpenses();
 }
 
 function removeRecurringExpense(expenseId) {
@@ -669,43 +719,36 @@ function removeRecurringExpense(expenseId) {
   state.recurringExpenses = state.recurringExpenses.filter((item) => item.id !== expenseId);
   persist();
   renderRecurringExpenses();
+  renderCalendar();
+  renderSelectedDateTransactions();
 }
 
-function promptRecurringExpense(existing = null) {
-  const name = normalizeTextInput(prompt("Recurring expense name", existing?.name || "") || "");
-  if (!name) return null;
-  const amount = parseAmount(prompt("Monthly amount", existing?.amount ? String(existing.amount) : "0") || "0");
-  const category = promptCategory(existing?.categoryId);
-  if (!category) return null;
-  const paymentMethod = promptPaymentMethod(existing?.paymentMethod);
-  if (!paymentMethod) return null;
-  const dueDay = clampCutoffDay(prompt("Due day of month", String(existing?.dueDay || 1)) || "1");
-  const note = normalizeTextInput(prompt("Note", existing?.note || "") || "");
-  return {
-    id: existing?.id || `${slugify(name)}-${Date.now()}`,
-    name,
-    amount,
-    categoryId: category.id,
-    paymentMethod,
-    dueDay,
-    note
-  };
-}
-
-function promptCategory(currentCategoryId = "") {
-  const categories = state.categories.expense;
-  const current = findCategory("expense", currentCategoryId) || categories[0];
-  const answer = normalizeTextInput(prompt(`Category (${categories.map((category) => category.name).join(", ")})`, current?.name || "") || "");
-  if (!answer) return null;
-  return categories.find((category) => category.name.toLowerCase() === answer.toLowerCase() || category.id === slugify(answer)) || current;
-}
-
-function promptPaymentMethod(currentMethod = "") {
-  const methods = getPaymentMethods();
-  const current = methods.includes(currentMethod) ? currentMethod : methods[0];
-  const answer = normalizeTextInput(prompt(`Payment method (${methods.join(", ")})`, current || "") || "");
-  if (!answer) return null;
-  return methods.find((method) => method.toLowerCase() === answer.toLowerCase()) || current;
+function handleRecurringChange(event) {
+  const field = event.target.closest("[data-recurring-field]");
+  if (!field || !recurringEditMode) return;
+  const expense = state.recurringExpenses.find((item) => item.id === field.dataset.recurringId);
+  if (!expense) return;
+  if (field.dataset.recurringField === "amount") {
+    expense.amount = parseAmount(field.value);
+  } else if (field.dataset.recurringField === "dueDay") {
+    expense.dueDay = clampCutoffDay(field.value);
+  } else if (field.dataset.recurringField === "clusterId") {
+    expense.clusterId = field.value;
+    const cluster = getRecurringCluster(expense);
+    if (!getClusterCategoryIds(cluster).includes(expense.categoryId)) {
+      expense.categoryId = getClusterCategoryIds(cluster)[0] || expense.categoryId;
+    }
+  } else if (field.dataset.recurringField === "categoryId") {
+    expense.categoryId = field.value;
+  } else if (field.dataset.recurringField === "paymentMethod") {
+    expense.paymentMethod = field.value;
+  } else if (field.dataset.recurringField === "name") {
+    expense.name = normalizeTextInput(field.value) || expense.name;
+  }
+  persist();
+  renderRecurringExpenses();
+  renderCalendar();
+  renderSelectedDateTransactions();
 }
 
 function renderPaymentMethodsSettings() {
@@ -867,6 +910,8 @@ function renderBudget() {
   els.budgetList.querySelectorAll("[data-category-remove]").forEach((button) => {
     button.addEventListener("click", () => removeCategory(button.dataset.categoryRemove));
   });
+
+  renderRecurringExpenses();
 }
 
 function renderHistory() {
@@ -1097,6 +1142,20 @@ function transactionTemplate(item) {
         <small>${details}</small>
       </div>
       <strong class="${amountClass}">${sign}${formatMoney(item.amount)}</strong>
+    </article>
+  `;
+}
+
+function expectedRecurringTemplate(item) {
+  const category = findCategory("expense", item.categoryId);
+  const group = getRecurringCluster(item, selectedDate.slice(0, 7));
+  return `
+    <article class="transaction-item expected-item">
+      <div>
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>${escapeHtml(group.name)} - ${escapeHtml(category?.name || "Uncategorized")} - ${escapeHtml(item.paymentMethod)}</small>
+      </div>
+      <strong class="amount-negative">-${formatMoney(item.amount)}</strong>
     </article>
   `;
 }
@@ -1677,7 +1736,7 @@ function normalizeState(input) {
     goals: input.goals || structuredClone(DEFAULT_GOALS),
     paymentMethods,
     creditCards,
-    recurringExpenses: normalizeRecurringExpenses(input.recurringExpenses, knownPaymentMethods, categories),
+    recurringExpenses: normalizeRecurringExpenses(input.recurringExpenses, knownPaymentMethods, categories, budgets),
     assets: Array.isArray(input.assets) ? input.assets : structuredClone(DEFAULT_ASSETS),
     assetUpdatedAt: input.assetUpdatedAt || latestDateFromAssets(input.assets) || toDateInputValue(new Date())
   };
@@ -1734,11 +1793,13 @@ function normalizePaymentMethods(methods) {
   return [...defaults, ...extras];
 }
 
-function normalizeRecurringExpenses(expenses, paymentMethods = getKnownPaymentMethods(), categories = DEFAULT_CATEGORIES) {
+function normalizeRecurringExpenses(expenses, paymentMethods = getKnownPaymentMethods(), categories = DEFAULT_CATEGORIES, budgets = {}) {
   const source = Array.isArray(expenses) ? expenses : structuredClone(DEFAULT_RECURRING_EXPENSES);
   const expenseCategories = categories.expense || DEFAULT_CATEGORIES.expense;
   const fallbackCategory = expenseCategories[0]?.id || "personal";
   const fallbackPayment = paymentMethods[0] || "Cash";
+  const fallbackBudget = Object.values(budgets)[0];
+  const fallbackCluster = fallbackBudget ? getBudgetClusters(fallbackBudget, categories)[0]?.id : "";
   return source
     .map((expense, index) => {
       const name = normalizeTextInput(expense.name || "");
@@ -1748,6 +1809,7 @@ function normalizeRecurringExpenses(expenses, paymentMethods = getKnownPaymentMe
         id: expense.id || `${slugify(name)}-${index}`,
         name,
         amount: parseAmount(expense.amount || 0),
+        clusterId: expense.clusterId || fallbackCluster,
         categoryId: categoryExists ? expense.categoryId : fallbackCategory,
         paymentMethod: paymentMethods.includes(expense.paymentMethod) ? expense.paymentMethod : fallbackPayment,
         dueDay: clampCutoffDay(expense.dueDay || 1),
@@ -1836,6 +1898,26 @@ function getActiveCluster(budget) {
 
 function getClusterById(budget, clusterId) {
   return getBudgetClusters(budget).find((cluster) => cluster.id === clusterId);
+}
+
+function getRecurringCluster(item, monthKey = currentMonth) {
+  const budget = state.budgets[monthKey] || state.budgets[currentMonth];
+  const clusters = getBudgetClusters(budget);
+  return clusters.find((cluster) => cluster.id === item.clusterId) || clusters[0];
+}
+
+function getRecurringDate(monthKey, item) {
+  const [year, month] = monthKey.split("-").map(Number);
+  const lastDay = new Date(year, month, 0).getDate();
+  const day = Math.min(clampCutoffDay(item.dueDay), lastDay);
+  return `${monthKey}-${String(day).padStart(2, "0")}`;
+}
+
+function getRecurringExpensesForDate(dateKey) {
+  const monthKey = dateKey.slice(0, 7);
+  return state.recurringExpenses
+    .filter((item) => getRecurringDate(monthKey, item) === dateKey)
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function getClusterCategoryIds(cluster) {

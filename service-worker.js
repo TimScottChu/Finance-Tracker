@@ -1,9 +1,9 @@
-const CACHE_NAME = "php-finance-tracker-v23";
+const CACHE_NAME = "php-finance-tracker-v24";
 const APP_SHELL = [
   "./",
   "./index.html",
-  "./styles.css?v=23",
-  "./app.js?v=23",
+  "./styles.css?v=24",
+  "./app.js?v=24",
   "./manifest.webmanifest",
   "./icons/icon.svg"
 ];

@@ -368,6 +368,78 @@ main {
   font-size: 18px;
 }
 
+.recurring-list {
+  display: grid;
+  gap: 10px;
+}
+
+.recurring-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+.recurring-row:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.recurring-row > span {
+  display: grid;
+  gap: 3px;
+}
+
+.recurring-row small {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recurring-row.editing {
+  display: grid;
+  grid-template-columns: 1fr 132px 1fr 1fr;
+  align-items: end;
+}
+
+@media (max-width: 559px) {
+  .recurring-row.editing {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .recurring-row.editing > input {
+    grid-column: 1 / -1;
+  }
+}
+
+.recurring-row.editing label {
+  display: grid;
+  gap: 5px;
+}
+
+.recurring-row.editing label span {
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.recurring-row.editing input,
+.recurring-row.editing select {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: #fff;
+  font: inherit;
+}
+
+.recurring-row.editing .money-input.compact {
+  min-height: 38px;
+}
+
 .panel {
   margin-top: 16px;
   padding: 18px;
@@ -674,8 +746,30 @@ main {
 }
 
 .calendar-cell small {
+  display: block;
   color: var(--muted);
   font-size: 10px;
+}
+
+.calendar-cell small.expected {
+  color: var(--mint-dark);
+}
+
+.expected-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 12px;
+}
+
+.expected-list > strong {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.expected-item {
+  background: var(--mint-soft);
 }
 
 .entry-form {
