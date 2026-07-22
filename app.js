@@ -300,6 +300,8 @@ function bindEvents() {
   els.addRecurring.addEventListener("click", addRecurringExpense);
   els.recurringList.addEventListener("click", handleRecurringAction);
   els.recurringList.addEventListener("change", handleRecurringChange);
+  document.addEventListener("focusin", handleMoneyInputFocus);
+  document.addEventListener("focusout", handleMoneyInputBlur);
   bindSwipe(els.summaryBudgetPanel, () => changeCluster(1), () => changeCluster(-1));
   bindSwipe(els.budgetScreen, () => changeCluster(1), () => changeCluster(-1));
   bindSwipe(els.calendarPanel, () => changeMonth(1), () => changeMonth(-1));
@@ -737,7 +739,7 @@ function renderRecurringExpenses() {
                     <input value="${escapeAttribute(item.name)}" data-recurring-field="name" data-recurring-id="${item.id}" aria-label="Recurring name" />
                     <div class="money-input compact">
                       <span>PHP</span>
-                      <input inputmode="decimal" value="${item.amount || ""}" data-recurring-field="amount" data-recurring-id="${item.id}" aria-label="${escapeAttribute(item.name)} amount" />
+                      <input inputmode="decimal" value="${formatInputMoney(item.amount)}" data-money-input data-recurring-field="amount" data-recurring-id="${item.id}" aria-label="${escapeAttribute(item.name)} amount" />
                     </div>
                     <label>
                       <span>Category</span>
@@ -962,7 +964,7 @@ function renderBudget() {
                 ? `<input class="category-name-input" value="${escapeAttribute(category?.name || "Uncategorized")}" data-category-field="name" data-category="${categoryId}" aria-label="${escapeAttribute(category?.name || "Uncategorized")} name" />`
                 : `<h3>${category?.name || "Uncategorized"}</h3>`
             }
-            <input inputmode="decimal" value="${limit || ""}" data-budget-category="${categoryId}" aria-label="${category?.name || "Uncategorized"} budget" />
+            <input inputmode="decimal" value="${formatInputMoney(limit)}" data-money-input data-budget-category="${categoryId}" aria-label="${category?.name || "Uncategorized"} budget" />
             ${
               categoryEditMode
                 ? `<button class="remove-icon-button" type="button" data-category-remove="${categoryId}" aria-label="Remove ${escapeAttribute(category?.name || "category")}"></button>`
@@ -1098,7 +1100,7 @@ function renderAssets() {
           }
           ${
             assetsEditMode
-              ? `<label class="asset-balance-input"><span>PHP</span><input inputmode="decimal" value="${asset.balance}" data-asset-field="balance" data-asset="${asset.id}" aria-label="${escapeAttribute(asset.account)} balance" /></label>`
+              ? `<label class="asset-balance-input"><span>PHP</span><input inputmode="decimal" value="${formatInputMoney(asset.balance)}" data-money-input data-asset-field="balance" data-asset="${asset.id}" aria-label="${escapeAttribute(asset.account)} balance" /></label>`
               : `<span>${formatAssetMoney(asset.balance)}</span>`
           }
           ${
@@ -1193,7 +1195,20 @@ function renderCalculator() {
 }
 
 function formatCalculatorResult(value) {
-  return Number(value.toFixed(2)).toString();
+  return formatInputMoney(value);
+}
+
+function handleMoneyInputFocus(event) {
+  const input = event.target.closest?.("[data-money-input]");
+  if (!input) return;
+  input.value = stripMoneyFormatting(input.value);
+  input.select?.();
+}
+
+function handleMoneyInputBlur(event) {
+  const input = event.target.closest?.("[data-money-input]");
+  if (!input) return;
+  input.value = formatInputMoney(parseAmount(input.value));
 }
 
 function saveTransaction() {
@@ -1284,7 +1299,7 @@ function openTransactionModal(transactionId) {
   populateEditCategories(transaction.type, els.editTransactionCluster.value, transaction.date);
   els.editTransactionCategory.value = transaction.categoryId;
   els.editTransactionPrefix.textContent = transaction.type === "expense" ? "- PHP" : "+ PHP";
-  els.editTransactionAmount.value = transaction.amount;
+  els.editTransactionAmount.value = formatInputMoney(transaction.amount);
   els.editTransactionTime.value = transaction.time;
   els.editTransactionDate.value = transaction.date;
   els.editTransactionNote.value = transaction.note || "";
@@ -2093,6 +2108,19 @@ function parseAmount(value) {
     }
   }
   return Number(cleaned) || 0;
+}
+
+function stripMoneyFormatting(value) {
+  return String(value).replace(/,/g, "").trim();
+}
+
+function formatInputMoney(value) {
+  const number = Number(value) || 0;
+  if (!number) return "";
+  return new Intl.NumberFormat("en-US", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2
+  }).format(number);
 }
 
 function formatMoney(value) {

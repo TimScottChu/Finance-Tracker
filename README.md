@@ -40,6 +40,7 @@ Data is stored locally in the browser/PWA storage. There is no login and no host
 - Recurring expense tracker under Budget for subscriptions and monthly payables
 - Asset tracker with editable balances and reorder controls
 - Calculator-style amount input, such as `100+25`, `500-125`, or `1000/2`
+- Money-style numeric inputs, such as `10,000.00`
 - Auto-capitalized notes, group names, category names, and asset names
 - Transaction CSV export
 - Asset CSV export
