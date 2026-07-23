@@ -258,6 +258,8 @@ function bindEvents() {
     if (!row) return;
     expandedSummaryCategoryId = expandedSummaryCategoryId === row.dataset.summaryCategory ? "" : row.dataset.summaryCategory;
     renderHomeBudgetBars();
+    renderCalendar();
+    renderSelectedDateTransactions();
   });
   els.calendarGrid.addEventListener("click", (event) => {
     if (wasRecentSwipe()) return;
@@ -427,7 +429,7 @@ function changeCluster(offset) {
   activeClusterIndex = (activeClusterIndex + offset + clusters.length) % clusters.length;
   expandedSummaryCategoryId = "";
   selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
-  renderHomeBudgetBars();
+  renderHome();
   renderEntry();
   renderBudget();
 }
@@ -493,8 +495,9 @@ function render() {
 
 function renderHome() {
   const totals = getMonthTotals(currentMonth);
+  const recurringTotal = getRecurringMonthTotal(currentMonth);
   els.homeIncome.textContent = formatPrivateMoney(totals.income);
-  els.homeExpenses.textContent = formatPrivateMoney(totals.expense);
+  els.homeExpenses.textContent = formatPrivateMoney(totals.expense + recurringTotal);
   els.privacyToggles.forEach((button) => {
     button.classList.toggle("hidden-values", !summaryValuesVisible);
     button.setAttribute("aria-label", summaryValuesVisible ? "Hide summary values" : "Show summary values");
@@ -517,13 +520,14 @@ function renderHomeBudgetBars() {
     .map((categoryId) => {
       const category = findCategory("expense", categoryId);
       const limit = cluster.categories[categoryId] ?? 0;
-      const spent = getCategorySpent(currentMonth, categoryId, cluster.id);
+      const spent = getCategorySpent(currentMonth, categoryId, cluster.id, { includeRecurring: true });
       const remaining = limit - spent;
       const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
       const capped = Math.min(100, Math.max(0, percent));
       const statusClass = getBudgetStatusClass(percent);
       const isExpanded = expandedSummaryCategoryId === categoryId;
       const transactions = isExpanded ? getCategoryTransactions(currentMonth, categoryId, cluster.id) : [];
+      const recurringItems = isExpanded ? getRecurringExpensesForCategory(cluster.id, categoryId) : [];
       return `
         <button class="home-budget-row ${isExpanded ? "expanded" : ""}" type="button" data-summary-category="${categoryId}">
           <div class="home-budget-labels">
@@ -540,8 +544,17 @@ function renderHomeBudgetBars() {
               ? `<div class="summary-category-detail">
                   <div class="summary-category-total">Month total <strong>${formatMoney(spent)}</strong></div>
                   ${
-                    transactions.length
-                      ? transactions
+                    transactions.length || recurringItems.length
+                      ? [
+                          ...recurringItems.map(
+                            (item) => `
+                              <span>
+                                <small>${formatShortDate(getRecurringDate(currentMonth, item))} recurring - ${escapeHtml(item.name)}</small>
+                                <strong>${formatMoney(item.amount)}</strong>
+                              </span>
+                            `
+                          ),
+                          ...transactions
                           .map(
                             (item) => `
                               <span>
@@ -550,7 +563,7 @@ function renderHomeBudgetBars() {
                               </span>
                             `
                           )
-                          .join("")
+                        ].join("")
                       : `<small>No spending yet.</small>`
                   }
                 </div>`
@@ -601,6 +614,7 @@ function renderCalendar() {
   const todayKey = toDateInputValue(new Date());
   const weekdays = ["S", "M", "T", "W", "T", "F", "S"];
   const cells = weekdays.map((day) => `<div class="calendar-cell weekday">${day}</div>`);
+  const filter = getCalendarFilter();
 
   for (let i = 0; i < first.getDay(); i += 1) {
     cells.push(`<div></div>`);
@@ -609,9 +623,9 @@ function renderCalendar() {
   for (let day = 1; day <= last.getDate(); day += 1) {
     const dateKey = `${currentMonth}-${String(day).padStart(2, "0")}`;
     const spent = state.transactions
-      .filter((item) => item.date === dateKey && item.type === "expense")
+      .filter((item) => item.date === dateKey && item.type === "expense" && transactionMatchesCalendarFilter(item, filter))
       .reduce((sum, item) => sum + item.amount, 0);
-    const expected = getRecurringExpensesForDate(dateKey).reduce((sum, item) => sum + item.amount, 0);
+    const expected = getRecurringExpensesForDate(dateKey, filter).reduce((sum, item) => sum + item.amount, 0);
     cells.push(`
       <button class="calendar-cell ${dateKey === todayKey ? "today" : ""} ${dateKey === selectedDate && selectedDateDetailsOpen ? "selected" : ""}" type="button" data-date="${dateKey}">
         <strong>${day}</strong>
@@ -627,16 +641,17 @@ function renderCalendar() {
 function renderSelectedDateTransactions() {
   els.selectedDatePanel.classList.toggle("hidden", !selectedDateDetailsOpen);
   if (!selectedDateDetailsOpen) return;
+  const filter = getCalendarFilter();
   const items = state.transactions
-    .filter((item) => item.date === selectedDate)
+    .filter((item) => item.date === selectedDate && transactionMatchesCalendarFilter(item, filter))
     .sort((a, b) => b.time.localeCompare(a.time));
   const expenseTotal = items
     .filter((item) => item.type === "expense")
     .reduce((sum, item) => sum + item.amount, 0);
-  const expectedItems = getRecurringExpensesForDate(selectedDate);
+  const expectedItems = getRecurringExpensesForDate(selectedDate, filter);
 
   els.selectedDateTitle.textContent = formatDisplayDate(selectedDate);
-  els.selectedDateTotal.textContent = formatMoney(expenseTotal);
+  els.selectedDateTotal.textContent = formatMoney(expenseTotal + expectedItems.reduce((sum, item) => sum + item.amount, 0));
   els.toggleTransactionEdit.textContent = transactionEditMode ? "Done" : "Edit";
   els.toggleTransactionEdit.classList.toggle("hidden", !items.length);
   const expectedMarkup = expectedItems.length
@@ -649,6 +664,21 @@ function renderSelectedDateTransactions() {
     : "";
   const transactionMarkup = items.length ? items.map(transactionTemplate).join("") : `<p class="empty">No transactions on this date.</p>`;
   els.selectedDateList.innerHTML = `${expectedMarkup}${transactionMarkup}`;
+}
+
+function getCalendarFilter() {
+  const cluster = getActiveCluster(state.budgets[currentMonth]);
+  return {
+    clusterId: cluster.id,
+    categoryId: expandedSummaryCategoryId && getClusterCategoryIds(cluster).includes(expandedSummaryCategoryId) ? expandedSummaryCategoryId : ""
+  };
+}
+
+function transactionMatchesCalendarFilter(item, filter) {
+  if (item.type !== "expense") return true;
+  if (filter.clusterId && getTransactionClusterId(item) !== filter.clusterId) return false;
+  if (filter.categoryId && item.categoryId !== filter.categoryId) return false;
+  return true;
 }
 
 function renderEntry() {
@@ -968,7 +998,7 @@ function renderBudget() {
     .map((categoryId) => {
       const category = findCategory("expense", categoryId);
       const limit = cluster.categories[categoryId] ?? 0;
-      const spent = getCategorySpent(currentMonth, categoryId, cluster.id);
+      const spent = getCategorySpent(currentMonth, categoryId, cluster.id, { includeRecurring: true });
       const remaining = limit - spent;
       const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
       const capped = Math.min(100, Math.max(0, percent));
@@ -1035,7 +1065,7 @@ function renderHistory() {
   const monthRows = Array.from({ length: 12 }, (_, index) => {
     const monthKey = `${historyYear}-${String(index + 1).padStart(2, "0")}`;
     const budgeted = state.budgets[monthKey] ? sumBudgetClusters(state.budgets[monthKey]) : 0;
-    const spent = getMonthTotals(monthKey).expense;
+    const spent = getMonthTotals(monthKey).expense + getRecurringMonthTotal(monthKey);
     return {
       monthKey,
       monthName: monthLong(monthKey),
@@ -1774,14 +1804,16 @@ function clampCutoffDay(value) {
   return Math.min(31, Math.max(1, Number(value) || 1));
 }
 
-function getCategorySpent(monthKey, categoryId, clusterId = "") {
-  return state.transactions
+function getCategorySpent(monthKey, categoryId, clusterId = "", options = {}) {
+  const transactionTotal = state.transactions
     .filter((item) => {
       if (item.type !== "expense" || item.categoryId !== categoryId || !item.date.startsWith(monthKey)) return false;
       if (!clusterId) return true;
       return getTransactionClusterId(item) === clusterId;
     })
     .reduce((sum, item) => sum + item.amount, 0);
+  const recurringTotal = options.includeRecurring ? getRecurringExpensesForCategory(clusterId, categoryId).reduce((sum, item) => sum + item.amount, 0) : 0;
+  return transactionTotal + recurringTotal;
 }
 
 function getCategoryTransactions(monthKey, categoryId, clusterId = "") {
@@ -1796,7 +1828,7 @@ function getCategoryTransactions(monthKey, categoryId, clusterId = "") {
 
 function getClusterTotals(monthKey, cluster) {
   const budgeted = sumClusterBudget(cluster);
-  const spent = getClusterCategoryIds(cluster).reduce((sum, categoryId) => sum + getCategorySpent(monthKey, categoryId, cluster.id), 0);
+  const spent = getClusterCategoryIds(cluster).reduce((sum, categoryId) => sum + getCategorySpent(monthKey, categoryId, cluster.id, { includeRecurring: true }), 0);
   return { budgeted, spent, remaining: budgeted - spent };
 }
 
@@ -1808,7 +1840,7 @@ function getMonthBudgetDetails(monthKey) {
       getClusterCategoryIds(cluster).map((categoryId) => {
         const category = findCategory("expense", categoryId);
         const limit = cluster.categories[categoryId] ?? 0;
-        const spent = getCategorySpent(monthKey, categoryId, cluster.id);
+        const spent = getCategorySpent(monthKey, categoryId, cluster.id, { includeRecurring: true });
         const difference = limit - spent;
         return {
           name: `${category?.name || "Uncategorized"} (${cluster.name})`,
@@ -2042,6 +2074,18 @@ function getRecurringExpensesForCluster(clusterId) {
     .sort((a, b) => a.dueDay - b.dueDay || a.name.localeCompare(b.name));
 }
 
+function getRecurringExpensesForCategory(clusterId, categoryId) {
+  return state.recurringExpenses
+    .filter((item) => item.clusterId === clusterId && item.categoryId === categoryId)
+    .sort((a, b) => a.dueDay - b.dueDay || a.name.localeCompare(b.name));
+}
+
+function getRecurringMonthTotal(monthKey, filter = {}) {
+  return state.recurringExpenses
+    .filter((item) => recurringMatchesFilter(item, filter))
+    .reduce((sum, item) => sum + item.amount, 0);
+}
+
 function getRecurringDate(monthKey, item) {
   const [year, month] = monthKey.split("-").map(Number);
   const lastDay = new Date(year, month, 0).getDate();
@@ -2049,11 +2093,18 @@ function getRecurringDate(monthKey, item) {
   return `${monthKey}-${String(day).padStart(2, "0")}`;
 }
 
-function getRecurringExpensesForDate(dateKey) {
+function getRecurringExpensesForDate(dateKey, filter = {}) {
   const monthKey = dateKey.slice(0, 7);
   return state.recurringExpenses
     .filter((item) => getRecurringDate(monthKey, item) === dateKey)
+    .filter((item) => recurringMatchesFilter(item, filter))
     .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function recurringMatchesFilter(item, filter = {}) {
+  if (filter.clusterId && item.clusterId !== filter.clusterId) return false;
+  if (filter.categoryId && item.categoryId !== filter.categoryId) return false;
+  return true;
 }
 
 function getClusterCategoryIds(cluster) {

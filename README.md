@@ -33,6 +33,7 @@ Data is stored locally in the browser/PWA storage. There is no login and no host
 - Budget groups with category budgets
 - Budget bars that show spent progress, remaining amount, and tap-to-view category transactions
 - Calendar view with daily expense totals
+- Calendar view follows the active budget group, and narrows to a tapped Summary category
 - Editable transaction details
 - Payment methods: Cash, Credit Card - BPI, Credit Card - Metro, Digital Wallet
 - Credit-card statement view with cutoff day, statement period, and transaction details
@@ -120,7 +121,7 @@ Each recurring item has:
 - payment method
 - credit day
 
-Recurring items show on the Summary calendar as expected expenses. Summary also shows a recurring total with budget-group breakdown when tapped. They do not automatically create actual spending transactions, so bank-statement checking stays clean.
+Recurring items are counted in Summary expenses and budget progress. They also show on the Summary calendar as expected expenses. Summary shows a recurring total with budget-group breakdown when tapped.
 
 Tap the recurring total to show or hide the breakdown. In Edit mode, tap one recurring item first before editing its fields.
 
