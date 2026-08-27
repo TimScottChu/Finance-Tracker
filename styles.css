@@ -1162,6 +1162,38 @@ main {
   color: var(--text);
 }
 
+.summary-category-detail .summary-detail-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 0;
+}
+
+.summary-category-detail .summary-detail-copy {
+  display: grid;
+  justify-content: start;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+
+.summary-category-detail .summary-detail-copy strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.summary-category-detail .summary-detail-copy small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .progress-fill {
   width: var(--width);
   height: 100%;
@@ -1332,6 +1364,66 @@ main {
 
 .asset-summary strong {
   font-size: 22px;
+}
+
+.asset-view-switch {
+  margin: 0 0 14px;
+}
+
+.earnings-month-controls {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  padding: 10px 0;
+  margin-bottom: 14px;
+}
+
+.earnings-month-controls strong {
+  text-align: center;
+}
+
+.earnings-list {
+  display: grid;
+  margin: 12px 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+.earnings-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  border-top: 1px solid var(--line);
+  padding: 9px 10px;
+  background: #fff;
+}
+
+.earnings-row:first-child {
+  border-top: 0;
+}
+
+.earnings-row.editing {
+  grid-template-columns: minmax(0, 1fr) auto 36px;
+}
+
+.earnings-row > span {
+  display: grid;
+  gap: 2px;
+}
+
+.earnings-row small {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.earnings-row > strong {
+  text-align: right;
 }
 
 .asset-list {

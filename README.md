@@ -11,7 +11,7 @@ https://timscottchu.github.io/Finance-Tracker/
 Local project folder:
 
 ```text
-C:\Users\Admin\Documents\App Development\fin-tracker
+C:\Users\Admin\Desktop\Projects\Codex_Projects\fin-tracker
 ```
 
 ## What The App Does
@@ -36,10 +36,11 @@ Data is stored locally in the browser/PWA storage. There is no login and no host
 - Calendar view follows the active budget group, and narrows to a tapped Summary category
 - Editable transaction details
 - Payment methods: Cash, Credit Card - BPI, Credit Card - Metro, Digital Wallet
-- Credit-card statement view with cutoff day, statement period, and transaction details
+- Credit-card statement view with cutoff day, statement period, manual purchases, and expected recurring card charges
 - History view with yearly month-by-month totals, overspending markers, and tap-to-view saved/overspent categories
 - Recurring expense tracker under Budget for subscriptions and monthly payables
 - Asset tracker with editable balances and reorder controls
+- Monthly Earnings view grouped by editable income categories
 - Calculator-style amount input, such as `100+25`, `500-125`, or `1000/2`
 - Money-style numeric inputs, such as `10,000.00`
 - Auto-capitalized notes, group names, category names, and asset names
@@ -70,7 +71,7 @@ Important: before clearing site data, export a backup JSON. Clearing site data d
 For a quick desktop preview, open:
 
 ```text
-C:\Users\Admin\Documents\App Development\fin-tracker\index.html
+C:\Users\Admin\Desktop\Projects\Codex_Projects\fin-tracker\index.html
 ```
 
 This is enough to test most features. Service-worker/PWA behavior is best tested through GitHub Pages or a local server.
@@ -129,7 +130,9 @@ Swipe left/right anywhere on the Summary budget panel or Budget screen to move b
 
 ### Track Assets
 
-Go to **Assets** to track account balances. Tap **Edit** to update balances, add/remove assets, or move assets up/down.
+Go to **Assets** and use the **Assets | Earnings** switch. Assets tracks account balances; tap **Edit** to update balances, add/remove assets, or move assets up/down.
+
+Earnings shows the selected month's income grouped by category. Its Edit categories mode can add, rename, or remove income categories. Removing a category hides it from future Add entries while preserving its historical records.
 
 ### Export And Backup
 

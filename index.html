@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#10bfa8" />
     <title>PHP Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=33" />
+    <link rel="stylesheet" href="styles.css?v=34" />
   </head>
   <body>
     <div class="app-shell">
@@ -214,7 +214,12 @@
         </section>
 
         <section class="screen" id="assets-screen" aria-labelledby="assets-tab">
-          <section class="panel">
+          <div class="segmented asset-view-switch" role="tablist" aria-label="Assets view">
+            <button class="active" id="assets-view-button" type="button" data-assets-view="assets">Assets</button>
+            <button id="earnings-view-button" type="button" data-assets-view="earnings">Earnings</button>
+          </div>
+
+          <section class="panel" id="assets-panel">
             <div class="section-heading">
               <h2 id="asset-title">Asset tracker</h2>
               <div class="inline-actions">
@@ -229,10 +234,28 @@
             </div>
             <div id="assets-list" class="asset-list"></div>
           </section>
+
+          <section class="panel hidden" id="earnings-panel">
+            <div class="section-heading">
+              <h2>Earnings</h2>
+              <button class="text-button" id="toggle-income-categories-edit" type="button">Edit categories</button>
+            </div>
+            <div class="earnings-month-controls">
+              <button class="calendar-nav" id="earnings-month-prev" type="button" aria-label="Previous earnings month">&lt;</button>
+              <strong id="earnings-month-label">June 2026</strong>
+              <button class="calendar-nav" id="earnings-month-next" type="button" aria-label="Next earnings month">&gt;</button>
+            </div>
+            <div class="asset-summary">
+              <span>Total earned</span>
+              <strong id="earnings-total">PHP 0.00</strong>
+            </div>
+            <div id="earnings-list" class="earnings-list"></div>
+            <button class="secondary-button hidden" id="add-income-category" type="button">Add income category</button>
+          </section>
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v33</p>
+          <p class="app-version">App version v34</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
             <button class="export-tile export-wide" id="export-assets-csv" type="button">Export assets CSV</button>
@@ -379,6 +402,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=33"></script>
+    <script src="app.js?v=34"></script>
   </body>
 </html>

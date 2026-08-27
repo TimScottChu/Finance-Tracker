@@ -75,6 +75,8 @@ let editingTransactionId = "";
 let selectedCardDetailId = "";
 let summaryValuesVisible = true;
 let assetsValuesVisible = true;
+let assetsView = "assets";
+let incomeCategoryEditMode = false;
 let expandedSummaryCategoryId = "";
 let calculatorTarget = null;
 let calculatorExpression = "";
@@ -108,7 +110,7 @@ const els = {
   entryPaymentRow: document.querySelector("#entry-payment-row"),
   entryPaymentMethod: document.querySelector("#entry-payment-method"),
   categoryChips: document.querySelector("#category-chips"),
-  typeButtons: document.querySelectorAll(".segmented button"),
+  typeButtons: document.querySelectorAll("#transaction-form [data-type]"),
   privacyToggles: document.querySelectorAll("[data-privacy-toggle]"),
   homeIncome: document.querySelector("#home-income"),
   homeExpenses: document.querySelector("#home-expenses"),
@@ -188,6 +190,16 @@ const els = {
   addAsset: document.querySelector("#add-asset"),
   toggleAssetsVisibility: document.querySelector("#toggle-assets-visibility"),
   toggleAssetsEdit: document.querySelector("#toggle-assets-edit"),
+  assetViewButtons: document.querySelectorAll("[data-assets-view]"),
+  assetsPanel: document.querySelector("#assets-panel"),
+  earningsPanel: document.querySelector("#earnings-panel"),
+  earningsMonthPrev: document.querySelector("#earnings-month-prev"),
+  earningsMonthNext: document.querySelector("#earnings-month-next"),
+  earningsMonthLabel: document.querySelector("#earnings-month-label"),
+  earningsTotal: document.querySelector("#earnings-total"),
+  earningsList: document.querySelector("#earnings-list"),
+  toggleIncomeCategoriesEdit: document.querySelector("#toggle-income-categories-edit"),
+  addIncomeCategory: document.querySelector("#add-income-category"),
   exportCsv: document.querySelector("#export-csv"),
   exportAssetsCsv: document.querySelector("#export-assets-csv"),
   exportBackup: document.querySelector("#export-backup"),
@@ -387,6 +399,24 @@ function bindEvents() {
   });
   els.assetsList.addEventListener("click", handleAssetAction);
   els.assetsList.addEventListener("change", handleAssetFieldChange);
+  els.assetViewButtons.forEach((button) => {
+    button.addEventListener("click", () => {
+      assetsView = button.dataset.assetsView;
+      incomeCategoryEditMode = false;
+      assetsEditMode = false;
+      renderAssets();
+      renderEarnings();
+    });
+  });
+  els.earningsMonthPrev.addEventListener("click", () => changeMonth(-1));
+  els.earningsMonthNext.addEventListener("click", () => changeMonth(1));
+  els.toggleIncomeCategoriesEdit.addEventListener("click", () => {
+    incomeCategoryEditMode = !incomeCategoryEditMode;
+    renderEarnings();
+  });
+  els.addIncomeCategory.addEventListener("click", addIncomeCategory);
+  els.earningsList.addEventListener("change", handleIncomeCategoryChange);
+  els.earningsList.addEventListener("click", handleIncomeCategoryAction);
   els.exportCsv.addEventListener("click", exportCsv);
   els.exportAssetsCsv.addEventListener("click", exportAssetsCsv);
   els.exportBackup.addEventListener("click", exportBackup);
@@ -489,6 +519,7 @@ function render() {
   renderEntry();
   renderBudget();
   renderAssets();
+  renderEarnings();
   renderPaymentMethodsSettings();
   renderHistory();
 }
@@ -548,8 +579,11 @@ function renderHomeBudgetBars() {
                       ? [
                           ...recurringItems.map(
                             (item) => `
-                              <span>
-                                <small>${formatShortDate(getRecurringDate(currentMonth, item))} recurring - ${escapeHtml(item.name)}</small>
+                              <span class="summary-detail-row">
+                                <span class="summary-detail-copy">
+                                  <strong>${escapeHtml(item.name)}</strong>
+                                  <small>${escapeHtml(category?.name || "Uncategorized")} - ${formatShortDate(getRecurringDate(currentMonth, item))} recurring</small>
+                                </span>
                                 <strong>${formatMoney(item.amount)}</strong>
                               </span>
                             `
@@ -557,8 +591,11 @@ function renderHomeBudgetBars() {
                           ...transactions
                           .map(
                             (item) => `
-                              <span>
-                                <small>${formatShortDate(item.date)} ${item.time}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+                              <span class="summary-detail-row">
+                                <span class="summary-detail-copy">
+                                  <strong>${escapeHtml(item.note || category?.name || "Purchase")}</strong>
+                                  <small>${escapeHtml(category?.name || "Uncategorized")} - ${formatShortDate(item.date)} ${item.time}</small>
+                                </span>
                                 <strong>${formatMoney(item.amount)}</strong>
                               </span>
                             `
@@ -729,7 +766,7 @@ function populatePaymentMethods(select, row, visible, selected = getFallbackPaym
 }
 
 function getEntryCategories() {
-  if (entryType !== "expense") return state.categories[entryType] || [];
+  if (entryType !== "expense") return (state.categories[entryType] || []).filter((category) => category.active !== false);
   const cluster = getClusterById(state.budgets[currentMonth], selectedEntryClusterId) || getActiveCluster(state.budgets[currentMonth]);
   return getClusterCategoryIds(cluster)
     .map((categoryId) => findCategory("expense", categoryId))
@@ -843,9 +880,8 @@ function addRecurringExpense() {
   editingRecurringId = item.id;
   persist();
   renderRecurringExpenses();
-  renderSummaryRecurring();
-  renderCalendar();
-  renderSelectedDateTransactions();
+  renderHome();
+  renderBudget();
 }
 
 function handleRecurringAction(event) {
@@ -870,9 +906,8 @@ function removeRecurringExpense(expenseId) {
   if (editingRecurringId === expenseId) editingRecurringId = "";
   persist();
   renderRecurringExpenses();
-  renderSummaryRecurring();
-  renderCalendar();
-  renderSelectedDateTransactions();
+  renderHome();
+  renderBudget();
 }
 
 function handleRecurringChange(event) {
@@ -893,9 +928,8 @@ function handleRecurringChange(event) {
   }
   persist();
   renderRecurringExpenses();
-  renderSummaryRecurring();
-  renderCalendar();
-  renderSelectedDateTransactions();
+  renderHome();
+  renderBudget();
 }
 
 function renderPaymentMethodsSettings() {
@@ -970,11 +1004,13 @@ function renderCardDetail() {
     ? transactions
         .map((item) => {
           const category = findCategory(item.type, item.categoryId);
+          const purchaseName = item.note || (item.recurring ? item.name : "") || category?.name || "Purchase";
+          const detail = [category?.name || "Uncategorized", formatDisplayDate(item.date), item.time, item.recurring ? "Recurring" : ""].filter(Boolean).join(" - ");
           return `
-            <article class="transaction-item">
+            <article class="transaction-item ${item.recurring ? "expected-item" : ""}">
               <div>
-                <strong>${category?.name || "Uncategorized"}</strong>
-                <small>${formatDisplayDate(item.date)} - ${item.time}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
+                <strong>${escapeHtml(purchaseName)}</strong>
+                <small>${escapeHtml(detail)}</small>
               </div>
               <strong class="amount-negative">-${formatMoney(item.amount)}</strong>
             </article>
@@ -1122,6 +1158,9 @@ function renderHistory() {
 }
 
 function renderAssets() {
+  els.assetViewButtons.forEach((button) => button.classList.toggle("active", button.dataset.assetsView === assetsView));
+  els.assetsPanel.classList.toggle("hidden", assetsView !== "assets");
+  els.earningsPanel.classList.toggle("hidden", assetsView !== "earnings");
   const total = state.assets.reduce((sum, asset) => sum + asset.balance, 0);
   const trackerDate = state.assetUpdatedAt || latestAssetDate();
   els.assetTitle.textContent = `Asset tracker (${formatDisplayDate(trackerDate)})`;
@@ -1163,6 +1202,91 @@ function renderAssets() {
       `)
       .join("")}
   `;
+}
+
+function renderEarnings() {
+  const categoryTotals = getIncomeCategoryTotals(currentMonth);
+  const categories = state.categories.income.filter((category) => category.active !== false || (categoryTotals[category.id] || 0) > 0);
+  const total = Object.values(categoryTotals).reduce((sum, amount) => sum + amount, 0);
+  els.earningsMonthLabel.textContent = monthLong(currentMonth);
+  els.earningsTotal.textContent = formatMoney(total);
+  els.toggleIncomeCategoriesEdit.textContent = incomeCategoryEditMode ? "Done" : "Edit categories";
+  els.addIncomeCategory.classList.toggle("hidden", !incomeCategoryEditMode);
+  els.earningsList.innerHTML = categories.length
+    ? categories
+        .map((category) => {
+          const archived = category.active === false;
+          return `
+            <div class="earnings-row ${incomeCategoryEditMode ? "editing" : ""}">
+              ${
+                incomeCategoryEditMode && !archived
+                  ? `<input class="category-name-input" value="${escapeAttribute(category.name)}" data-income-category-field="name" data-income-category="${category.id}" aria-label="${escapeAttribute(category.name)} name" />`
+                  : `<span><strong>${escapeHtml(category.name)}</strong>${archived ? "<small>Archived</small>" : ""}</span>`
+              }
+              <strong>${formatMoney(categoryTotals[category.id] || 0)}</strong>
+              ${
+                incomeCategoryEditMode && !archived
+                  ? `<button class="remove-icon-button" type="button" data-income-category-remove="${category.id}" aria-label="Remove ${escapeAttribute(category.name)}"></button>`
+                  : ""
+              }
+            </div>
+          `;
+        })
+        .join("")
+    : `<p class="empty">No income categories yet.</p>`;
+}
+
+function addIncomeCategory() {
+  const name = prompt("Income category name");
+  if (!name) return;
+  const normalizedName = normalizeTextInput(name);
+  const existing = state.categories.income.find((category) => category.name.toLowerCase() === normalizedName.toLowerCase());
+  if (existing) {
+    existing.active = true;
+  } else {
+    const idBase = slugify(normalizedName) || "income";
+    let id = idBase;
+    let suffix = 2;
+    while (state.categories.income.some((category) => category.id === id)) {
+      id = `${idBase}-${suffix}`;
+      suffix += 1;
+    }
+    state.categories.income.push({ id, name: normalizedName, icon: "", active: true });
+  }
+  persist();
+  renderEntry();
+  renderEarnings();
+}
+
+function handleIncomeCategoryChange(event) {
+  const input = event.target.closest("[data-income-category-field]");
+  if (!input || !incomeCategoryEditMode) return;
+  const category = state.categories.income.find((item) => item.id === input.dataset.incomeCategory);
+  if (!category) return;
+  category.name = normalizeTextInput(input.value) || category.name;
+  persist();
+  renderEntry();
+  renderEarnings();
+}
+
+function handleIncomeCategoryAction(event) {
+  const button = event.target.closest("[data-income-category-remove]");
+  if (!button || !incomeCategoryEditMode) return;
+  const activeCategories = state.categories.income.filter((category) => category.active !== false);
+  const category = activeCategories.find((item) => item.id === button.dataset.incomeCategoryRemove);
+  if (!category) return;
+  if (activeCategories.length === 1) {
+    alert("Keep at least one income category available.");
+    return;
+  }
+  if (!confirm(`Remove ${category.name} from future income entries? Historical records will be preserved.`)) return;
+  category.active = false;
+  if (entryType === "income" && selectedCategory === category.id) {
+    selectedCategory = state.categories.income.find((item) => item.active !== false)?.id || "";
+  }
+  persist();
+  renderEntry();
+  renderEarnings();
 }
 
 function openCalculator(target) {
@@ -1294,11 +1418,12 @@ function transactionTemplate(item) {
   const group = item.type === "expense" ? findTransactionCluster(item) : null;
   const sign = item.type === "expense" ? "-" : "+";
   const amountClass = item.type === "expense" ? "amount-negative" : "amount-positive";
-  const details = [item.time, group?.name, item.type === "expense" ? item.paymentMethod : "", item.note].filter(Boolean).map(escapeHtml).join(" - ");
+  const purchaseName = item.note || category?.name || (item.type === "expense" ? "Purchase" : "Income");
+  const details = [category?.name || "Uncategorized", item.time, group?.name, item.type === "expense" ? item.paymentMethod : ""].filter(Boolean).map(escapeHtml).join(" - ");
   return `
     <article class="transaction-item ${transactionEditMode ? "editable" : ""}" ${transactionEditMode ? `data-transaction-action="open" data-transaction="${item.id}"` : ""}>
       <div>
-        <strong>${category?.name || "Uncategorized"}</strong>
+        <strong>${escapeHtml(purchaseName)}</strong>
         <small>${details}</small>
       </div>
       <strong class="${amountClass}">${sign}${formatMoney(item.amount)}</strong>
@@ -1730,6 +1855,16 @@ function getMonthTotals(monthKey) {
     );
 }
 
+function getIncomeCategoryTotals(monthKey) {
+  const totals = Object.fromEntries(state.categories.income.map((category) => [category.id, 0]));
+  state.transactions
+    .filter((item) => item.type === "income" && item.date.startsWith(monthKey))
+    .forEach((item) => {
+      totals[item.categoryId] = (totals[item.categoryId] || 0) + item.amount;
+    });
+  return totals;
+}
+
 function getPaymentMethodTotals(monthKey) {
   const methods = getPaymentMethods();
   return state.transactions
@@ -1745,9 +1880,28 @@ function getCreditCardTransactions(cardId, monthKey) {
   const card = getCreditCardSetting(cardId);
   if (!card) return [];
   const period = getStatementPeriod(monthKey, card.cutoffDay);
-  return state.transactions
-    .filter((item) => item.type === "expense" && item.paymentMethod === card.method && item.date >= period.start && item.date <= period.end)
-    .sort((a, b) => `${b.date}T${b.time}`.localeCompare(`${a.date}T${a.time}`));
+  const transactions = state.transactions.filter(
+    (item) => item.type === "expense" && item.paymentMethod === card.method && item.date >= period.start && item.date <= period.end
+  );
+  const recurring = getRecurringCreditCardEntries(card, period);
+  return [...transactions, ...recurring].sort((a, b) => `${b.date}T${b.time || ""}`.localeCompare(`${a.date}T${a.time || ""}`));
+}
+
+function getRecurringCreditCardEntries(card, period) {
+  const months = new Set([period.start.slice(0, 7), period.end.slice(0, 7)]);
+  return [...months].flatMap((monthKey) =>
+    state.recurringExpenses
+      .filter((item) => item.paymentMethod === card.method)
+      .map((item) => ({
+        ...item,
+        id: `expected-${item.id}-${monthKey}`,
+        type: "expense",
+        date: getRecurringDate(monthKey, item),
+        time: "",
+        recurring: true
+      }))
+      .filter((item) => item.date >= period.start && item.date <= period.end)
+  );
 }
 
 function getCreditCardSetting(cardId) {
@@ -1983,6 +2137,12 @@ function normalizeRecurringExpenses(expenses, paymentMethods = getKnownPaymentMe
 
 function normalizeCategories(categories) {
   const normalized = categories || structuredClone(DEFAULT_CATEGORIES);
+  normalized.expense = Array.isArray(normalized.expense) ? normalized.expense : structuredClone(DEFAULT_CATEGORIES.expense);
+  normalized.income = (Array.isArray(normalized.income) ? normalized.income : structuredClone(DEFAULT_CATEGORIES.income)).map((category) => ({
+    ...category,
+    active: category.active !== false
+  }));
+  normalized.saving = Array.isArray(normalized.saving) ? normalized.saving : structuredClone(DEFAULT_CATEGORIES.saving);
   const utilities = normalized.expense?.find((category) => category.id === "utilities");
   if (utilities) {
     utilities.id = "living-costs";
