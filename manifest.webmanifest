@@ -1,5 +1,5 @@
 {
-  "name": "PHP Finance Tracker",
+  "name": "Finance Tracker",
   "short_name": "Finance",
   "description": "Offline-first personal finance tracker with budget groups, assets, history, and CSV export.",
   "start_url": ".",

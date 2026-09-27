@@ -1,4 +1,4 @@
-# PHP Finance Tracker
+# Finance Tracker
 
 Offline-first personal finance tracker built as a mobile-friendly PWA. It is designed for quick daily entry on an Android phone, with CSV/JSON exports for documentation and backup.
 
@@ -25,6 +25,12 @@ Amount -> Budget group -> Category -> Payment method -> Save
 ```
 
 Data is stored locally in the browser/PWA storage. There is no login and no hosted database.
+
+## Currencies
+
+Use the currency switch in the header to choose PHP or JPY. Each currency has its own transactions, budgets, recurring expenses, credit-card totals, assets, earnings, and history. Existing records remain in PHP. The first JPY view copies category and budget-group names with zero budgets, and starts with no transactions or assets. Enter yen amounts as whole numbers. The app does not convert between currencies.
+
+CSV exports cover the selected currency and include a Currency column. A JSON backup contains both currency ledgers. Older single-ledger backups still restore to PHP.
 
 ## Main Features
 
@@ -140,7 +146,7 @@ Go to **Settings**:
 
 - Export transactions CSV for spreadsheet documentation
 - Export assets CSV
-- Export backup JSON before major changes or before clearing site data
+- Export backup JSON for both currencies before major changes or before clearing site data
 - Import backup JSON to restore data
 - Export feedback TXT after a test run
 

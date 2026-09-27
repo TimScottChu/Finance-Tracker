@@ -1,5 +1,8 @@
 const STORAGE_KEY = "php-finance-tracker-v1";
 const FEEDBACK_STORAGE_KEY = "php-finance-tracker-feedback-v1";
+const JPY_STORAGE_KEY = "php-finance-tracker-jpy-v1";
+const CURRENCY_STORAGE_KEY = "php-finance-tracker-currency-v1";
+const SUPPORTED_CURRENCIES = ["PHP", "JPY"];
 
 const DEFAULT_CATEGORIES = {
   expense: [
@@ -55,7 +58,10 @@ const DEFAULT_CREDIT_CARDS = [
   { id: "metro", name: "Metro", method: "Credit Card - Metro", cutoffDay: 25 }
 ];
 
-let state = loadState();
+let activeCurrency = SUPPORTED_CURRENCIES.includes(localStorage.getItem(CURRENCY_STORAGE_KEY))
+  ? localStorage.getItem(CURRENCY_STORAGE_KEY)
+  : "PHP";
+let state = loadState(activeCurrency);
 let currentMonth = getMonthKey(new Date());
 let selectedDate = toDateInputValue(new Date());
 let historyYear = new Date().getFullYear();
@@ -86,14 +92,14 @@ let activeClusterIndex = 0;
 let selectedEntryClusterId = "";
 let selectedPaymentMethod = getFallbackPaymentMethod();
 
-const peso = new Intl.NumberFormat("en-PH", {
-  style: "currency",
-  currency: "PHP",
-  maximumFractionDigits: 2
-});
+const moneyFormatters = {
+  PHP: new Intl.NumberFormat("en-PH", { style: "currency", currency: "PHP", minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+  JPY: new Intl.NumberFormat("en-JP", { style: "currency", currency: "JPY", maximumFractionDigits: 0 })
+};
 
 const els = {
   screenTitle: document.querySelector("#screen-title"),
+  currencySelect: document.querySelector("#currency-select"),
   monthLabel: document.querySelector("#month-label"),
   monthPrev: document.querySelector("#month-prev"),
   monthNext: document.querySelector("#month-next"),
@@ -169,6 +175,7 @@ const els = {
   deleteTransaction: document.querySelector("#delete-transaction"),
   calculatorModal: document.querySelector("#calculator-modal"),
   calculatorTitle: document.querySelector("#calculator-title"),
+  calculatorCurrency: document.querySelector("#calculator-currency"),
   calculatorGrid: document.querySelector("#calculator-grid"),
   calculatorOpenButtons: document.querySelectorAll("[data-calculator-target]"),
   budgetClusterPrev: document.querySelector("#budget-cluster-prev"),
@@ -228,6 +235,7 @@ function initialize() {
 }
 
 function bindEvents() {
+  els.currencySelect.addEventListener("change", () => changeCurrency(els.currencySelect.value));
   els.navButtons.forEach((button) => {
     button.addEventListener("click", () => showScreen(button.dataset.screen));
   });
@@ -338,7 +346,7 @@ function bindEvents() {
     populateEditClusters(els.editTransactionDate.value);
     populateEditCategories(els.editTransactionType.value, els.editTransactionCluster.value, els.editTransactionDate.value);
     populatePaymentMethods(els.editTransactionPaymentMethod, els.editTransactionPaymentRow, els.editTransactionType.value === "expense");
-    els.editTransactionPrefix.textContent = els.editTransactionType.value === "expense" ? "- PHP" : "+ PHP";
+    els.editTransactionPrefix.textContent = `${els.editTransactionType.value === "expense" ? "-" : "+"} ${activeCurrency}`;
   });
   els.editTransactionCluster.addEventListener("change", () => {
     populateEditCategories(els.editTransactionType.value, els.editTransactionCluster.value, els.editTransactionDate.value);
@@ -514,6 +522,8 @@ function wasRecentSwipe() {
 
 function render() {
   ensureMonthBudget(currentMonth);
+  els.currencySelect.value = activeCurrency;
+  els.calculatorCurrency.textContent = activeCurrency;
   els.monthLabel.textContent = monthLong(currentMonth);
   renderHome();
   renderEntry();
@@ -522,6 +532,32 @@ function render() {
   renderEarnings();
   renderPaymentMethodsSettings();
   renderHistory();
+}
+
+function changeCurrency(currency) {
+  if (!SUPPORTED_CURRENCIES.includes(currency) || currency === activeCurrency) return;
+  activeCurrency = currency;
+  localStorage.setItem(CURRENCY_STORAGE_KEY, currency);
+  state = loadState(currency);
+  activeClusterIndex = 0;
+  selectedEntryClusterId = "";
+  selectedPaymentMethod = getFallbackPaymentMethod();
+  selectedCategory = state.categories.expense[0]?.id || "";
+  entryType = "expense";
+  expandedSummaryCategoryId = "";
+  selectedDateDetailsOpen = false;
+  transactionEditMode = false;
+  categoryEditMode = false;
+  recurringEditMode = false;
+  editingRecurringId = "";
+  assetsEditMode = false;
+  incomeCategoryEditMode = false;
+  closeTransactionModal();
+  closeCardDetail();
+  closeCalculator();
+  els.amount.value = "";
+  els.note.value = "";
+  render();
 }
 
 function renderHome() {
@@ -720,7 +756,7 @@ function transactionMatchesCalendarFilter(item, filter) {
 
 function renderEntry() {
   els.typeButtons.forEach((button) => button.classList.toggle("active", button.dataset.type === entryType));
-  els.amountPrefix.textContent = entryType === "expense" ? "-" : "+";
+  els.amountPrefix.textContent = `${entryType === "expense" ? "-" : "+"}${activeCurrency === "JPY" ? "¥" : "₱"}`;
   els.amountPrefix.parentElement.style.color = entryType === "expense" ? "var(--pink)" : "var(--mint-dark)";
   renderEntryClusterSelector();
   populatePaymentMethods(els.entryPaymentMethod, els.entryPaymentRow, entryType === "expense", selectedPaymentMethod);
@@ -822,7 +858,7 @@ function renderRecurringExpenses() {
                   ? `
                     <input value="${escapeAttribute(item.name)}" data-recurring-field="name" data-recurring-id="${item.id}" aria-label="Recurring name" />
                     <div class="money-input compact">
-                      <span>PHP</span>
+                      <span>${activeCurrency}</span>
                       <input inputmode="decimal" value="${formatInputMoney(item.amount)}" data-money-input data-recurring-field="amount" data-recurring-id="${item.id}" aria-label="${escapeAttribute(item.name)} amount" />
                     </div>
                     <label>
@@ -916,7 +952,7 @@ function handleRecurringChange(event) {
   const expense = state.recurringExpenses.find((item) => item.id === field.dataset.recurringId);
   if (!expense) return;
   if (field.dataset.recurringField === "amount") {
-    expense.amount = parseAmount(field.value);
+    expense.amount = parseEntryAmount(field.value);
   } else if (field.dataset.recurringField === "dueDay") {
     expense.dueDay = clampCutoffDay(field.value);
   } else if (field.dataset.recurringField === "categoryId") {
@@ -1074,7 +1110,7 @@ function renderBudget() {
 
   els.budgetList.querySelectorAll("[data-budget-category]").forEach((input) => {
     input.addEventListener("change", () => {
-      cluster.categories[input.dataset.budgetCategory] = parseAmount(input.value);
+      cluster.categories[input.dataset.budgetCategory] = parseEntryAmount(input.value);
       persist();
       render();
     });
@@ -1186,7 +1222,7 @@ function renderAssets() {
           }
           ${
             assetsEditMode
-              ? `<label class="asset-balance-input"><span>PHP</span><input inputmode="decimal" value="${formatInputMoney(asset.balance)}" data-money-input data-asset-field="balance" data-asset="${asset.id}" aria-label="${escapeAttribute(asset.account)} balance" /></label>`
+              ? `<label class="asset-balance-input"><span>${activeCurrency}</span><input inputmode="decimal" value="${formatInputMoney(asset.balance)}" data-money-input data-asset-field="balance" data-asset="${asset.id}" aria-label="${escapeAttribute(asset.account)} balance" /></label>`
               : `<span>${formatAssetMoney(asset.balance)}</span>`
           }
           ${
@@ -1336,9 +1372,9 @@ function handleCalculatorKey(event) {
   } else if (key === "back") {
     calculatorExpression = calculatorExpression.slice(0, -1);
   } else if (key === "=") {
-    calculatorExpression = formatCalculatorResult(parseAmount(calculatorExpression));
+    calculatorExpression = formatCalculatorResult(parseEntryAmount(calculatorExpression));
   } else if (key === "apply") {
-    const amount = parseAmount(calculatorExpression);
+    const amount = parseEntryAmount(calculatorExpression);
     if (calculatorTarget) {
       calculatorTarget.value = amount ? formatCalculatorResult(amount) : "";
       calculatorTarget.dispatchEvent(new Event("change", { bubbles: true }));
@@ -1379,11 +1415,11 @@ function handleMoneyInputFocus(event) {
 function handleMoneyInputBlur(event) {
   const input = event.target.closest?.("[data-money-input]");
   if (!input) return;
-  input.value = formatInputMoney(parseAmount(input.value));
+  input.value = formatInputMoney(parseEntryAmount(input.value));
 }
 
 function saveTransaction() {
-  const amount = parseAmount(els.amount.value);
+  const amount = parseEntryAmount(els.amount.value);
   if (entryType === "expense" && !selectedEntryClusterId) {
     selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
   }
@@ -1470,7 +1506,7 @@ function openTransactionModal(transactionId) {
   populatePaymentMethods(els.editTransactionPaymentMethod, els.editTransactionPaymentRow, transaction.type === "expense", transaction.paymentMethod);
   populateEditCategories(transaction.type, els.editTransactionCluster.value, transaction.date);
   els.editTransactionCategory.value = transaction.categoryId;
-  els.editTransactionPrefix.textContent = transaction.type === "expense" ? "- PHP" : "+ PHP";
+  els.editTransactionPrefix.textContent = `${transaction.type === "expense" ? "-" : "+"} ${activeCurrency}`;
   els.editTransactionAmount.value = formatInputMoney(transaction.amount);
   els.editTransactionTime.value = transaction.time;
   els.editTransactionDate.value = transaction.date;
@@ -1520,7 +1556,7 @@ function saveEditedTransaction(event) {
   transaction.categoryId = els.editTransactionCategory.value;
   transaction.clusterId = transaction.type === "expense" ? els.editTransactionCluster.value : "";
   transaction.paymentMethod = transaction.type === "expense" ? els.editTransactionPaymentMethod.value : "";
-  transaction.amount = parseAmount(els.editTransactionAmount.value);
+  transaction.amount = parseEntryAmount(els.editTransactionAmount.value);
   transaction.time = els.editTransactionTime.value;
   transaction.date = els.editTransactionDate.value;
   transaction.note = normalizeTextInput(els.editTransactionNote.value);
@@ -1562,7 +1598,7 @@ function addCategory() {
     state.categories.expense.push(category);
   }
 
-  const budgetAmount = parseAmount(prompt("Monthly budget", "0") || "0");
+  const budgetAmount = parseEntryAmount(prompt("Monthly budget", "0") || "0");
   cluster.categories[category.id] = budgetAmount;
   persist();
   render();
@@ -1732,7 +1768,7 @@ function addAsset() {
   const account = prompt("Account name");
   if (!account) return;
   const normalizedAccount = normalizeTextInput(account);
-  const balance = parseAmount(prompt("Current balance") || "0");
+  const balance = parseEntryAmount(prompt("Current balance") || "0");
   const id = `${slugify(normalizedAccount)}-${Date.now()}`;
   const date = toDateInputValue(new Date());
   state.assets.push({ id, account: normalizedAccount, balance, date });
@@ -1771,7 +1807,7 @@ function handleAssetFieldChange(event) {
   if (input.dataset.assetField === "account") {
     asset.account = normalizeTextInput(input.value) || asset.account;
   } else {
-    asset.balance = parseAmount(input.value);
+    asset.balance = parseEntryAmount(input.value);
   }
 
   asset.date = toDateInputValue(new Date());
@@ -1781,24 +1817,32 @@ function handleAssetFieldChange(event) {
 }
 
 function exportCsv() {
-  const header = ["Date", "Time", "Type", "Group", "Category", "Payment Method", "Amount", "Note"];
+  const header = ["Date", "Time", "Type", "Group", "Category", "Payment Method", "Currency", "Amount", "Note"];
   const rows = state.transactions.map((item) => {
     const category = findCategory(item.type, item.categoryId);
     const cluster = item.type === "expense" ? findTransactionCluster(item) : null;
-    return [item.date, item.time, item.type, cluster?.name || "", category?.name || "", item.paymentMethod || "", item.amount, item.note];
+    return [item.date, item.time, item.type, cluster?.name || "", category?.name || "", item.paymentMethod || "", activeCurrency, item.amount, item.note];
   });
-  downloadFile(`transactions-${currentMonth}.csv`, toCsv([header, ...rows]), "text/csv");
+  downloadFile(`transactions-${activeCurrency}-${currentMonth}.csv`, toCsv([header, ...rows]), "text/csv");
 }
 
 function exportAssetsCsv() {
-  const header = ["Tracker Date", "Account", "Balance"];
+  const header = ["Tracker Date", "Account", "Currency", "Balance"];
   const trackerDate = state.assetUpdatedAt || latestAssetDate();
-  const rows = state.assets.map((asset) => [trackerDate, asset.account, asset.balance]);
-  downloadFile(`assets-${trackerDate}.csv`, toCsv([header, ...rows]), "text/csv");
+  const rows = state.assets.map((asset) => [trackerDate, asset.account, activeCurrency, asset.balance]);
+  downloadFile(`assets-${activeCurrency}-${trackerDate}.csv`, toCsv([header, ...rows]), "text/csv");
 }
 
 function exportBackup() {
-  downloadFile(`finance-backup-${currentMonth}.json`, JSON.stringify(state, null, 2), "application/json");
+  const backup = {
+    formatVersion: 2,
+    activeCurrency,
+    ledgers: {
+      PHP: activeCurrency === "PHP" ? state : loadState("PHP"),
+      JPY: activeCurrency === "JPY" ? state : loadState("JPY")
+    }
+  };
+  downloadFile(`finance-backup-${currentMonth}.json`, JSON.stringify(backup, null, 2), "application/json");
 }
 
 function saveFeedback() {
@@ -1830,10 +1874,26 @@ function importBackup(event) {
   reader.onload = () => {
     try {
       const imported = JSON.parse(reader.result);
-      state = normalizeState(imported);
+      if (imported?.formatVersion === 2 && imported.ledgers?.PHP && imported.ledgers?.JPY) {
+        const phpState = normalizeState(imported.ledgers.PHP);
+        const jpyState = normalizeState(imported.ledgers.JPY);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(phpState));
+        localStorage.setItem(JPY_STORAGE_KEY, JSON.stringify(jpyState));
+        activeCurrency = SUPPORTED_CURRENCIES.includes(imported.activeCurrency) ? imported.activeCurrency : "PHP";
+        localStorage.setItem(CURRENCY_STORAGE_KEY, activeCurrency);
+        state = activeCurrency === "JPY" ? jpyState : phpState;
+      } else if (imported && Array.isArray(imported.transactions) && imported.budgets) {
+        activeCurrency = "PHP";
+        localStorage.setItem(CURRENCY_STORAGE_KEY, activeCurrency);
+        state = normalizeState(imported);
+      } else {
+        throw new Error("Invalid backup format");
+      }
       ensureMonthBudget(currentMonth);
       activeClusterIndex = 0;
       selectedEntryClusterId = getActiveCluster(state.budgets[currentMonth]).id;
+      selectedCategory = state.categories.expense[0]?.id || "";
+      selectedPaymentMethod = getFallbackPaymentMethod();
       persist();
       render();
     } catch {
@@ -2028,14 +2088,42 @@ function ensureMonthBudget(monthKey) {
   persist();
 }
 
-function loadState() {
-  const saved = localStorage.getItem(STORAGE_KEY);
-  if (!saved) return normalizeState({});
+function loadState(currency = activeCurrency) {
+  const saved = localStorage.getItem(currency === "JPY" ? JPY_STORAGE_KEY : STORAGE_KEY);
+  if (!saved) return normalizeState(currency === "JPY" ? createBlankYenState() : {});
   try {
     return normalizeState(JSON.parse(saved));
   } catch {
-    return normalizeState({});
+    return normalizeState(currency === "JPY" ? createBlankYenState() : {});
   }
+}
+
+function createBlankYenState() {
+  const pesoState = loadState("PHP");
+  const categories = structuredClone(pesoState.categories);
+  categories.expense.forEach((category) => { category.budget = 0; });
+  const monthKey = getMonthKey(new Date());
+  const sourceBudget = pesoState.budgets[monthKey];
+  const budgets = sourceBudget
+    ? {
+        [monthKey]: {
+          clusters: getBudgetClusters(sourceBudget).map((cluster) => ({
+            id: cluster.id,
+            name: cluster.name,
+            categories: Object.fromEntries(getClusterCategoryIds(cluster).map((categoryId) => [categoryId, 0]))
+          }))
+        }
+      }
+    : {};
+  return {
+    categories,
+    budgets,
+    paymentMethods: structuredClone(pesoState.paymentMethods),
+    creditCards: structuredClone(pesoState.creditCards),
+    transactions: [],
+    recurringExpenses: [],
+    assets: []
+  };
 }
 
 function normalizeState(input) {
@@ -2310,7 +2398,7 @@ function findTransactionCluster(transaction) {
 }
 
 function persist() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  localStorage.setItem(activeCurrency === "JPY" ? JPY_STORAGE_KEY : STORAGE_KEY, JSON.stringify(state));
 }
 
 function setDateTimeDefaults() {
@@ -2338,6 +2426,11 @@ function parseAmount(value) {
   return Number(cleaned) || 0;
 }
 
+function parseEntryAmount(value) {
+  const amount = parseAmount(value);
+  return activeCurrency === "JPY" ? Math.round(amount) : amount;
+}
+
 function stripMoneyFormatting(value) {
   return String(value).replace(/,/g, "").trim();
 }
@@ -2346,13 +2439,13 @@ function formatInputMoney(value) {
   const number = Number(value) || 0;
   if (!number) return "";
   return new Intl.NumberFormat("en-US", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2
+    minimumFractionDigits: activeCurrency === "JPY" ? 0 : 2,
+    maximumFractionDigits: activeCurrency === "JPY" ? 0 : 2
   }).format(number);
 }
 
 function formatMoney(value) {
-  return peso.format(value);
+  return moneyFormatters[activeCurrency].format(value);
 }
 
 function formatPrivateMoney(value) {

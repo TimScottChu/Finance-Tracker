@@ -63,6 +63,29 @@ select:focus-visible {
   padding: max(16px, env(safe-area-inset-top)) 20px 16px;
   color: #fff;
   background: var(--mint);
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.currency-picker {
+  display: grid;
+  gap: 3px;
+  flex: 0 0 auto;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+}
+
+.currency-picker select {
+  min-width: 72px;
+  min-height: 36px;
+  border: 1px solid rgba(255, 255, 255, 0.45);
+  border-radius: 8px;
+  padding: 0 8px;
+  color: #fff;
+  background: #0b9f8d;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
 }
 
 .eyebrow,

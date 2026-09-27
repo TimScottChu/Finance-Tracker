@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="theme-color" content="#10bfa8" />
-    <title>PHP Finance Tracker</title>
+    <title>Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=34" />
+    <link rel="stylesheet" href="styles.css?v=35" />
   </head>
   <body>
     <div class="app-shell">
@@ -15,6 +15,13 @@
           <p class="eyebrow">Personal tracker</p>
           <h1 id="screen-title">Summary</h1>
         </div>
+        <label class="currency-picker">
+          <span>Currency</span>
+          <select id="currency-select" aria-label="Currency ledger">
+            <option value="PHP">PHP</option>
+            <option value="JPY">JPY</option>
+          </select>
+        </label>
       </header>
 
       <main>
@@ -255,7 +262,7 @@
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v34</p>
+          <p class="app-version">App version v35</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
             <button class="export-tile export-wide" id="export-assets-csv" type="button">Export assets CSV</button>
@@ -375,7 +382,7 @@
     <div class="calculator-backdrop hidden" id="calculator-modal" role="dialog" aria-modal="true" aria-labelledby="calculator-title">
       <section class="calculator-sheet">
         <div class="calculator-display">
-          <span>PHP</span>
+          <span id="calculator-currency">PHP</span>
           <strong id="calculator-title">0</strong>
         </div>
         <div class="calculator-grid" id="calculator-grid">
@@ -402,6 +409,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=34"></script>
+    <script src="app.js?v=35"></script>
   </body>
 </html>
