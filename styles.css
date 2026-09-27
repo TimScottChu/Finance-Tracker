@@ -736,7 +736,7 @@ main {
 
 .calendar {
   display: grid;
-  grid-template-columns: repeat(7, 1fr);
+  grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 6px;
 }
 
@@ -767,6 +767,7 @@ main {
 }
 
 .calendar-cell {
+  min-width: 0;
   min-height: 56px;
   border: 0;
   border-radius: 8px;
@@ -799,8 +800,11 @@ main {
 
 .calendar-cell small {
   display: block;
+  overflow: hidden;
   color: var(--muted);
   font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .calendar-cell small.expected {
