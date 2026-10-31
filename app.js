@@ -2,6 +2,9 @@ const STORAGE_KEY = "php-finance-tracker-v1";
 const FEEDBACK_STORAGE_KEY = "php-finance-tracker-feedback-v1";
 const JPY_STORAGE_KEY = "php-finance-tracker-jpy-v1";
 const CURRENCY_STORAGE_KEY = "php-finance-tracker-currency-v1";
+const META_STORAGE_KEY = "php-finance-tracker-meta-v1";
+const PRE_IMPORT_STORAGE_KEY = "php-finance-tracker-pre-import-v1";
+const BACKUP_NUDGE_DAYS = 7;
 const SUPPORTED_CURRENCIES = ["PHP", "JPY"];
 
 const DEFAULT_CATEGORIES = {
@@ -217,17 +220,22 @@ const els = {
   feedbackNotes: document.querySelector("#feedback-notes"),
   saveFeedback: document.querySelector("#save-feedback"),
   clearFeedback: document.querySelector("#clear-feedback"),
-  exportFeedback: document.querySelector("#export-feedback")
+  exportFeedback: document.querySelector("#export-feedback"),
+  backupNudge: document.querySelector("#backup-nudge"),
+  storageError: document.querySelector("#storage-error"),
+  lastBackup: document.querySelector("#last-backup")
 };
 
 initialize();
 
 function initialize() {
+  requestPersistentStorage();
   ensureMonthBudget(currentMonth);
   setDateTimeDefaults();
   els.feedbackNotes.value = localStorage.getItem(FEEDBACK_STORAGE_KEY) || "";
   bindEvents();
   render();
+  renderBackupStatus();
 
   if ("serviceWorker" in navigator && ["http:", "https:"].includes(location.protocol)) {
     navigator.serviceWorker.register("service-worker.js");
@@ -537,7 +545,7 @@ function render() {
 function changeCurrency(currency) {
   if (!SUPPORTED_CURRENCIES.includes(currency) || currency === activeCurrency) return;
   activeCurrency = currency;
-  localStorage.setItem(CURRENCY_STORAGE_KEY, currency);
+  setStoredItem(CURRENCY_STORAGE_KEY, currency);
   state = loadState(currency);
   activeClusterIndex = 0;
   selectedEntryClusterId = "";
@@ -1843,16 +1851,49 @@ function exportBackup() {
     }
   };
   downloadFile(`finance-backup-${currentMonth}.json`, JSON.stringify(backup, null, 2), "application/json");
+  setStoredItem(META_STORAGE_KEY, JSON.stringify({ ...loadMeta(), lastBackupAt: new Date().toISOString() }));
+  renderBackupStatus();
+}
+
+function loadMeta() {
+  try {
+    return JSON.parse(localStorage.getItem(META_STORAGE_KEY)) || {};
+  } catch {
+    return {};
+  }
+}
+
+function renderBackupStatus() {
+  const lastBackupAt = new Date(loadMeta().lastBackupAt || "");
+  const hasBackup = !Number.isNaN(lastBackupAt.getTime());
+  els.lastBackup.textContent = hasBackup
+    ? `Last backup: ${lastBackupAt.toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })}`
+    : "Last backup: never";
+  const isStale = !hasBackup || Date.now() - lastBackupAt.getTime() > BACKUP_NUDGE_DAYS * 24 * 60 * 60 * 1000;
+  els.backupNudge.classList.toggle("hidden", !isStale);
+}
+
+function savePreImportSnapshot() {
+  const snapshot = {
+    formatVersion: 2,
+    savedAt: new Date().toISOString(),
+    activeCurrency,
+    ledgers: {
+      PHP: activeCurrency === "PHP" ? state : loadState("PHP"),
+      JPY: activeCurrency === "JPY" ? state : loadState("JPY")
+    }
+  };
+  return setStoredItem(PRE_IMPORT_STORAGE_KEY, JSON.stringify(snapshot));
 }
 
 function saveFeedback() {
-  localStorage.setItem(FEEDBACK_STORAGE_KEY, els.feedbackNotes.value);
+  setStoredItem(FEEDBACK_STORAGE_KEY, els.feedbackNotes.value);
 }
 
 function clearFeedback() {
   if (!confirm("Clear all feedback notes?")) return;
   els.feedbackNotes.value = "";
-  localStorage.removeItem(FEEDBACK_STORAGE_KEY);
+  removeStoredItem(FEEDBACK_STORAGE_KEY);
 }
 
 function exportFeedback() {
@@ -1874,17 +1915,23 @@ function importBackup(event) {
   reader.onload = () => {
     try {
       const imported = JSON.parse(reader.result);
+      const isValidBackup =
+        (imported?.formatVersion === 2 && imported.ledgers?.PHP && imported.ledgers?.JPY) ||
+        (imported && Array.isArray(imported.transactions) && imported.budgets);
+      if (isValidBackup && !savePreImportSnapshot() && !confirm("Could not save a copy of your current data before importing. Import anyway?")) {
+        return;
+      }
       if (imported?.formatVersion === 2 && imported.ledgers?.PHP && imported.ledgers?.JPY) {
         const phpState = normalizeState(imported.ledgers.PHP);
         const jpyState = normalizeState(imported.ledgers.JPY);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(phpState));
-        localStorage.setItem(JPY_STORAGE_KEY, JSON.stringify(jpyState));
+        setStoredItem(STORAGE_KEY, JSON.stringify(phpState));
+        setStoredItem(JPY_STORAGE_KEY, JSON.stringify(jpyState));
         activeCurrency = SUPPORTED_CURRENCIES.includes(imported.activeCurrency) ? imported.activeCurrency : "PHP";
-        localStorage.setItem(CURRENCY_STORAGE_KEY, activeCurrency);
+        setStoredItem(CURRENCY_STORAGE_KEY, activeCurrency);
         state = activeCurrency === "JPY" ? jpyState : phpState;
       } else if (imported && Array.isArray(imported.transactions) && imported.budgets) {
         activeCurrency = "PHP";
-        localStorage.setItem(CURRENCY_STORAGE_KEY, activeCurrency);
+        setStoredItem(CURRENCY_STORAGE_KEY, activeCurrency);
         state = normalizeState(imported);
       } else {
         throw new Error("Invalid backup format");
@@ -2398,7 +2445,37 @@ function findTransactionCluster(transaction) {
 }
 
 function persist() {
-  localStorage.setItem(activeCurrency === "JPY" ? JPY_STORAGE_KEY : STORAGE_KEY, JSON.stringify(state));
+  setStoredItem(activeCurrency === "JPY" ? JPY_STORAGE_KEY : STORAGE_KEY, JSON.stringify(state));
+}
+
+function setStoredItem(key, value) {
+  try {
+    localStorage.setItem(key, value);
+    return true;
+  } catch {
+    showStorageError();
+    return false;
+  }
+}
+
+function removeStoredItem(key) {
+  try {
+    localStorage.removeItem(key);
+  } catch {
+    showStorageError();
+  }
+}
+
+function showStorageError() {
+  els.storageError?.classList.remove("hidden");
+}
+
+function requestPersistentStorage() {
+  try {
+    navigator.storage?.persist?.().catch(() => {});
+  } catch {
+    // Persistence is best-effort.
+  }
 }
 
 function setDateTimeDefaults() {
