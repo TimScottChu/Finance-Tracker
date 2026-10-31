@@ -1259,6 +1259,14 @@ textarea::placeholder {
   font-weight: 700;
 }
 
+.month-left .per-day {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
 .month-left > .budget-detail:first-child strong {
   font-size: 32px;
   line-height: 1.1;

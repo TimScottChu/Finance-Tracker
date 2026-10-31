@@ -196,6 +196,7 @@ const els = {
   budgetMonthLeft: document.querySelector("#budget-month-left"),
   budgetMonthProgress: document.querySelector("#budget-month-progress"),
   budgetMonthSpent: document.querySelector("#budget-month-spent"),
+  budgetPerDay: document.querySelector("#budget-per-day"),
   clusterActions: document.querySelector("#cluster-actions"),
   renameCluster: document.querySelector("#rename-cluster"),
   addCluster: document.querySelector("#add-cluster"),
@@ -1085,6 +1086,25 @@ function renderCardDetail() {
     : `<p class="empty">No credit card transactions in this statement period.</p>`;
 }
 
+function getPerDayInfo(left, caps, monthKey, now = new Date()) {
+  if (!(caps > 0) || monthKey !== getMonthKey(now)) return null;
+  if (!(left > 0)) return { empty: true };
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const days = daysInMonth - now.getDate() + 1;
+  const perDay = activeCurrency === "JPY" ? Math.floor(left / days) : Math.floor((left / days) * 100) / 100;
+  return { perDay, days };
+}
+
+function renderPerDay(left, caps) {
+  const info = getPerDayInfo(left, caps, currentMonth);
+  els.budgetPerDay.classList.toggle("hidden", !info);
+  els.budgetPerDay.textContent = !info
+    ? ""
+    : info.empty
+      ? "No budget left this month"
+      : `${formatMoney(info.perDay)} / day for ${info.days} day${info.days === 1 ? "" : "s"}`;
+}
+
 function renderBudget() {
   const budget = state.budgets[currentMonth];
   const monthBudgeted = sumBudgetClusters(budget);
@@ -1096,6 +1116,7 @@ function renderBudget() {
   els.budgetMonthLeft.className = monthLeft < 0 ? "amount-negative" : "";
   els.budgetMonthProgress.className = `progress-fill ${getBudgetStatusClass(monthPercent)}`;
   els.budgetMonthProgress.style.setProperty("--width", `${Math.min(100, Math.max(0, monthPercent))}%`);
+  renderPerDay(monthLeft, monthBudgeted);
   els.budgetMonthSpent.textContent = `Spent ${formatMoney(monthSpent)} of ${formatMoney(monthBudgeted)}`;
   const cluster = getActiveCluster(budget);
   const clusterTotals = getClusterTotals(currentMonth, cluster);
