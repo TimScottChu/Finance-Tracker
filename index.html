@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#10bfa8" />
     <title>Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=36" />
+    <link rel="stylesheet" href="styles.css?v=37" />
   </head>
   <body>
     <div class="app-shell">
@@ -23,6 +23,11 @@
           </select>
         </label>
       </header>
+
+      <p class="app-notice notice-error hidden" id="storage-error" role="alert">
+        Changes could not be saved on this device. Export a backup JSON from Settings now.
+      </p>
+      <p class="app-notice hidden" id="backup-nudge">No backup in the last 7 days. Export a backup JSON from Settings.</p>
 
       <main>
         <section class="screen active" id="summary-screen" aria-labelledby="summary-tab">
@@ -189,6 +194,18 @@
                 <button class="text-button" id="toggle-category-edit" type="button">Edit categories</button>
               </div>
             </div>
+            <div class="month-left">
+              <div class="budget-detail">
+                <span id="budget-month-label">Left to spend</span>
+                <strong id="budget-month-left">PHP 0.00</strong>
+              </div>
+              <div class="progress-track compact">
+                <div class="progress-fill" id="budget-month-progress" style="--width:0%"></div>
+              </div>
+              <div class="budget-detail">
+                <span id="budget-month-spent">Spent PHP 0.00 of PHP 0.00</span>
+              </div>
+            </div>
             <div class="cluster-editor-heading">
               <button class="calendar-nav" id="budget-cluster-prev" type="button" aria-label="Previous budget group">&lt;</button>
               <strong id="budget-cluster-name">Personal</strong>
@@ -262,7 +279,8 @@
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v36</p>
+          <p class="app-version">App version v37</p>
+          <p class="app-version" id="last-backup">Last backup: never</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
             <button class="export-tile export-wide" id="export-assets-csv" type="button">Export assets CSV</button>
@@ -409,6 +427,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=36"></script>
+    <script src="app.js?v=37"></script>
   </body>
 </html>
