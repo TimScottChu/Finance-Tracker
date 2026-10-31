@@ -196,6 +196,7 @@ const els = {
   budgetMonthLeft: document.querySelector("#budget-month-left"),
   budgetMonthProgress: document.querySelector("#budget-month-progress"),
   budgetMonthSpent: document.querySelector("#budget-month-spent"),
+  budgetPerDay: document.querySelector("#budget-per-day"),
   clusterActions: document.querySelector("#cluster-actions"),
   renameCluster: document.querySelector("#rename-cluster"),
   addCluster: document.querySelector("#add-cluster"),
@@ -619,12 +620,14 @@ function renderHomeBudgetBars() {
         <button class="home-budget-row ${isExpanded ? "expanded" : ""}" type="button" data-summary-category="${categoryId}">
           <div class="home-budget-labels">
             <strong>${category?.name || "Uncategorized"}</strong>
-            <span class="${remaining < 0 ? "amount-negative" : ""}">
-              ${remaining < 0 ? "Over " : "Remaining "}${formatMoney(Math.abs(remaining))}
-            </span>
+            ${
+              limit > 0
+                ? `<span class="${remaining < 0 ? "amount-negative" : ""}">${remaining < 0 ? "Over " : "Remaining "}${formatMoney(Math.abs(remaining))}</span>`
+                : `<span class="no-cap">No cap set · spent ${formatMoney(spent)}</span>`
+            }
           </div>
-          <div class="progress-track compact">
-            <div class="progress-fill ${statusClass}" style="--width:${capped}%"></div>
+          <div class="progress-track compact ${limit > 0 ? "" : "uncapped"}">
+            <div class="progress-fill ${statusClass}" style="--width:${limit > 0 ? capped : 0}%"></div>
           </div>
           ${
             isExpanded
@@ -713,14 +716,21 @@ function renderCalendar() {
     cells.push(`<div></div>`);
   }
 
+  const dayTotals = [];
   for (let day = 1; day <= last.getDate(); day += 1) {
     const dateKey = `${currentMonth}-${String(day).padStart(2, "0")}`;
     const spent = state.transactions
       .filter((item) => item.date === dateKey && item.type === "expense" && transactionMatchesCalendarFilter(item, filter))
       .reduce((sum, item) => sum + item.amount, 0);
     const expected = getRecurringExpensesForDate(dateKey, filter).reduce((sum, item) => sum + item.amount, 0);
+    dayTotals.push({ day, dateKey, spent, expected });
+  }
+  const maxDayTotal = Math.max(0, ...dayTotals.map((item) => item.spent + item.expected));
+
+  for (const { day, dateKey, spent, expected } of dayTotals) {
+    const level = maxDayTotal > 0 && spent + expected > 0 ? Math.max(1, Math.ceil(((spent + expected) / maxDayTotal) * 5)) : 0;
     cells.push(`
-      <button class="calendar-cell ${dateKey === todayKey ? "today" : ""} ${dateKey === selectedDate && selectedDateDetailsOpen ? "selected" : ""}" type="button" data-date="${dateKey}">
+      <button class="calendar-cell ${level ? `spend-${level}` : ""} ${dateKey === todayKey ? "today" : ""} ${dateKey === selectedDate && selectedDateDetailsOpen ? "selected" : ""}" type="button" data-date="${dateKey}">
         <strong>${day}</strong>
         ${spent ? `<small>-${compactMoney(spent)}</small>` : ""}
         ${expected ? `<small class="expected">Exp -${compactMoney(expected)}</small>` : ""}
@@ -1076,6 +1086,25 @@ function renderCardDetail() {
     : `<p class="empty">No credit card transactions in this statement period.</p>`;
 }
 
+function getPerDayInfo(left, caps, monthKey, now = new Date()) {
+  if (!(caps > 0) || monthKey !== getMonthKey(now)) return null;
+  if (!(left > 0)) return { empty: true };
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const days = daysInMonth - now.getDate() + 1;
+  const perDay = activeCurrency === "JPY" ? Math.floor(left / days) : Math.floor((left / days) * 100) / 100;
+  return { perDay, days };
+}
+
+function renderPerDay(left, caps) {
+  const info = getPerDayInfo(left, caps, currentMonth);
+  els.budgetPerDay.classList.toggle("hidden", !info);
+  els.budgetPerDay.textContent = !info
+    ? ""
+    : info.empty
+      ? "No budget left this month"
+      : `${formatMoney(info.perDay)} / day for ${info.days} day${info.days === 1 ? "" : "s"}`;
+}
+
 function renderBudget() {
   const budget = state.budgets[currentMonth];
   const monthBudgeted = sumBudgetClusters(budget);
@@ -1087,6 +1116,7 @@ function renderBudget() {
   els.budgetMonthLeft.className = monthLeft < 0 ? "amount-negative" : "";
   els.budgetMonthProgress.className = `progress-fill ${getBudgetStatusClass(monthPercent)}`;
   els.budgetMonthProgress.style.setProperty("--width", `${Math.min(100, Math.max(0, monthPercent))}%`);
+  renderPerDay(monthLeft, monthBudgeted);
   els.budgetMonthSpent.textContent = `Spent ${formatMoney(monthSpent)} of ${formatMoney(monthBudgeted)}`;
   const cluster = getActiveCluster(budget);
   const clusterTotals = getClusterTotals(currentMonth, cluster);
@@ -1113,17 +1143,19 @@ function renderBudget() {
                 ? `<input class="category-name-input" value="${escapeAttribute(category?.name || "Uncategorized")}" data-category-field="name" data-category="${categoryId}" aria-label="${escapeAttribute(category?.name || "Uncategorized")} name" />`
                 : `<h3>${category?.name || "Uncategorized"}</h3>`
             }
-            <input inputmode="decimal" value="${formatInputMoney(limit)}" data-money-input data-budget-category="${categoryId}" aria-label="${category?.name || "Uncategorized"} budget" />
+            <label class="cap-input"><span>${currencySymbol()}</span><input inputmode="decimal" placeholder="Set cap" value="${formatInputMoney(limit)}" data-money-input data-budget-category="${categoryId}" aria-label="${category?.name || "Uncategorized"} budget" /></label>
             ${
               categoryEditMode
                 ? `<button class="remove-icon-button" type="button" data-category-remove="${categoryId}" aria-label="Remove ${escapeAttribute(category?.name || "category")}"></button>`
                 : ""
             }
           </div>
-          <div class="progress-track">
-            <div class="progress-fill ${statusClass}" style="--width:${capped}%"></div>
+          <div class="progress-track ${limit > 0 ? "" : "uncapped"}">
+            <div class="progress-fill ${statusClass}" style="--width:${limit > 0 ? capped : 0}%"></div>
           </div>
-          <div class="budget-detail">
+          ${
+            limit > 0
+              ? `<div class="budget-detail">
             <span>${percent}% of ${formatMoney(limit)}</span>
             <strong class="${remaining < 0 ? "amount-negative" : ""}">
               ${remaining < 0 ? "Over " : "Left "}${formatMoney(Math.abs(remaining))}
@@ -1132,7 +1164,11 @@ function renderBudget() {
           <div class="budget-detail">
             <span>Spent ${formatMoney(spent)}</span>
             <span>Budget ${formatMoney(limit)}</span>
-          </div>
+          </div>`
+              : `<div class="budget-detail">
+            <strong class="no-cap">No cap set · spent ${formatMoney(spent)}</strong>
+          </div>`
+          }
         </article>
       `;
     })
@@ -2593,6 +2629,10 @@ function parseEntryAmount(value) {
 
 function stripMoneyFormatting(value) {
   return String(value).replace(/,/g, "").trim();
+}
+
+function currencySymbol() {
+  return activeCurrency === "JPY" ? "¥" : "₱";
 }
 
 function formatInputMoney(value) {

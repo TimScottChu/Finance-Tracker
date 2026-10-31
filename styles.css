@@ -1,16 +1,91 @@
 :root {
+  color-scheme: light;
   --mint: #10bfa8;
-  --mint-dark: #079b88;
+  --mint-dark: #057b6c;
   --mint-soft: #d9f7f3;
+  --mint-tint: #f1fcfa;
+  --brand: #10bfa8;
+  --brand-glow: rgba(16, 191, 168, 0.32);
+  --picker-bg: #0b9f8d;
   --pink: #e85c7d;
+  --pink-text: #c93a5c;
   --amber: #f5aa2b;
   --blue: #4d9df7;
   --bg: #f2f5f9;
+  --page-bg: #dfe6ee;
   --card: #ffffff;
+  --surface: #ffffff;
+  --surface-2: #f4f7fa;
   --text: #141414;
-  --muted: #8c929e;
+  --muted: #667085;
+  --inactive: #6b7280;
   --line: #e7ebf0;
-  --shadow: 0 10px 24px rgba(19, 30, 43, 0.08);
+  --track: #e7e9ed;
+  --header-tint: #c9f4d1;
+  --notice-bg: #fff4dd;
+  --error-bg: #fde8ed;
+  --danger-bg: #fff3f2;
+  --danger-line: #ffd4d1;
+  --danger-text: #b42318;
+  --danger-solid: #ff3b35;
+  --focus: rgba(16, 191, 168, 0.5);
+  --scrim: rgba(20, 20, 20, 0.32);
+  --shell-shadow: rgba(19, 30, 43, 0.14);
+  --radius: 14px;
+  --shadow: 0 1px 2px rgba(19, 30, 43, 0.06), 0 8px 20px rgba(19, 30, 43, 0.07);
+  --shadow-lg: 0 18px 40px rgba(19, 30, 43, 0.22);
+  --spend-1: #d9f4f0;
+  --spend-2: #a9e6dd;
+  --spend-3: #6fd0c3;
+  --spend-4: #1a8f81;
+  --spend-5: #0b6e63;
+  --spend-fg-low: #0f3d37;
+  --spend-fg-high: #ffffff;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --mint: #2dd4bf;
+    --mint-dark: #5eead4;
+    --mint-soft: #123d38;
+    --mint-tint: #11302d;
+    --brand: #0a8a7a;
+    --brand-glow: rgba(0, 0, 0, 0.35);
+    --picker-bg: #086f63;
+    --pink: #f2708f;
+    --pink-text: #ff8fa8;
+    --amber: #f5b13d;
+    --bg: #0f1418;
+    --page-bg: #070a0d;
+    --card: #1a2128;
+    --surface: #1a2128;
+    --surface-2: #222b33;
+    --text: #eef2f6;
+    --muted: #a0a9b5;
+    --inactive: #94a0ad;
+    --line: #2d3741;
+    --track: #2b343d;
+    --header-tint: #1d4a3a;
+    --notice-bg: #3a2f14;
+    --error-bg: #3d1a24;
+    --danger-bg: #3d1a1a;
+    --danger-line: #6b2a28;
+    --danger-text: #ff9b94;
+    --danger-solid: #e5453f;
+    --focus: rgba(94, 234, 212, 0.6);
+    --scrim: rgba(0, 0, 0, 0.6);
+    --shell-shadow: rgba(0, 0, 0, 0.5);
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 20px rgba(0, 0, 0, 0.28);
+    --shadow-lg: 0 18px 40px rgba(0, 0, 0, 0.6);
+    --spend-1: #17413c;
+    --spend-2: #1d5c54;
+    --spend-3: #23796d;
+    --spend-4: #2a9a8b;
+    --spend-5: #4fd1c0;
+    --spend-fg-low: #eef2f6;
+    --spend-fg-high: #04201c;
+  }
 }
 
 * {
@@ -29,6 +104,29 @@ input {
   font: inherit;
 }
 
+.metric-grid strong,
+.budget-detail,
+.budget-cluster-summary,
+.calculated-total,
+.home-budget-labels,
+.history-row,
+.transaction-item,
+.recurring-row,
+.payment-method-row,
+.asset-row,
+.asset-summary,
+.earnings-row,
+.calendar-cell,
+.summary-category-detail,
+.summary-category-total,
+.amount-field,
+.calculator-display,
+.cap-input,
+.card-detail-summary,
+.month-left {
+  font-variant-numeric: tabular-nums;
+}
+
 button {
   cursor: pointer;
 }
@@ -42,7 +140,7 @@ select:focus {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 2px solid rgba(16, 191, 168, 0.38);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -62,7 +160,7 @@ select:focus-visible {
   align-items: center;
   padding: max(16px, env(safe-area-inset-top)) 20px 16px;
   color: #fff;
-  background: var(--mint);
+  background: var(--brand);
   justify-content: space-between;
   gap: 12px;
 }
@@ -82,7 +180,7 @@ select:focus-visible {
   border-radius: 8px;
   padding: 0 8px;
   color: #fff;
-  background: #0b9f8d;
+  background: var(--picker-bg);
   font: inherit;
   font-size: 14px;
   font-weight: 800;
@@ -154,7 +252,7 @@ main {
 .panel,
 .metric-grid article,
 .budget-card {
-  border-radius: 8px;
+  border-radius: var(--radius);
   background: var(--card);
   box-shadow: var(--shadow);
 }
@@ -369,7 +467,7 @@ main {
 
 .history-insight strong,
 .history-insight span {
-  color: var(--pink);
+  color: var(--pink-text);
   font-size: 13px;
 }
 
@@ -453,7 +551,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
-  background: #fff;
+  background: var(--surface);
 }
 
 @media (max-width: 559px) {
@@ -484,7 +582,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 7px 9px;
-  background: #fff;
+  background: var(--surface);
   font: inherit;
 }
 
@@ -535,7 +633,7 @@ main {
   grid-template-columns: 1fr auto auto;
   border-radius: 8px;
   padding: 10px;
-  background: #f8fafc;
+  background: var(--surface-2);
   cursor: pointer;
 }
 
@@ -585,7 +683,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 9px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .transaction-amount-input {
@@ -595,7 +693,7 @@ main {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
 }
@@ -626,10 +724,10 @@ main {
   width: 100%;
   min-height: 38px;
   margin-top: 10px;
-  border: 1px solid #ffd4d1;
+  border: 1px solid var(--danger-line);
   border-radius: 8px;
-  color: #d92e28;
-  background: #fff3f2;
+  color: var(--danger-text);
+  background: var(--danger-bg);
   font-weight: 900;
 }
 
@@ -640,17 +738,17 @@ main {
   display: grid;
   place-items: end center;
   padding: 18px;
-  background: rgba(20, 20, 20, 0.32);
+  background: var(--scrim);
 }
 
 .modal-card {
   width: min(100%, 500px);
   max-height: calc(100vh - 36px);
   overflow: auto;
-  border-radius: 8px;
+  border-radius: var(--radius);
   padding: 18px;
-  background: #fff;
-  box-shadow: 0 18px 40px rgba(19, 30, 43, 0.22);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
 }
 
 .modal-card .primary-button {
@@ -672,7 +770,7 @@ main {
   margin: 0 auto;
   overflow: hidden;
   border-radius: 18px 18px 0 0;
-  background: #fff;
+  background: var(--surface);
   box-shadow: 0 -18px 50px rgba(15, 23, 42, 0.2);
 }
 
@@ -710,7 +808,7 @@ main {
   border-right: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
   font-size: 28px;
 }
 
@@ -721,13 +819,13 @@ main {
 .calculator-ok {
   grid-row: span 2;
   color: #fff !important;
-  background: var(--mint) !important;
+  background: var(--brand) !important;
   font-size: 24px !important;
   font-weight: 900;
 }
 
 .amount-negative {
-  color: var(--pink);
+  color: var(--pink-text);
 }
 
 .amount-positive {
@@ -774,7 +872,7 @@ main {
   padding: 7px 4px;
   color: var(--text);
   text-align: center;
-  background: #f8fafc;
+  background: var(--surface-2);
 }
 
 .calendar-cell.weekday {
@@ -788,7 +886,33 @@ main {
   outline: 2px solid var(--mint);
 }
 
+.calendar-cell.spend-1 { background: var(--spend-1); }
+.calendar-cell.spend-2 { background: var(--spend-2); }
+.calendar-cell.spend-3 { background: var(--spend-3); }
+.calendar-cell.spend-4 { background: var(--spend-4); }
+.calendar-cell.spend-5 { background: var(--spend-5); }
+
+.calendar-cell.spend-1,
+.calendar-cell.spend-2,
+.calendar-cell.spend-3 {
+  color: var(--spend-fg-low);
+}
+
+.calendar-cell.spend-4,
+.calendar-cell.spend-5 {
+  color: var(--spend-fg-high);
+}
+
+.calendar-cell[class*="spend-"] small,
+.calendar-cell[class*="spend-"] small.expected {
+  color: inherit;
+}
+
 .calendar-cell.selected {
+  box-shadow: inset 0 0 0 2px var(--mint-dark);
+}
+
+.calendar-cell.selected:not([class*="spend-"]) {
   color: var(--mint-dark);
   background: var(--mint-soft);
 }
@@ -845,8 +969,8 @@ main {
 .chips button {
   border: 1px solid transparent;
   border-radius: 999px;
-  background: #fff;
-  color: #a6abb3;
+  background: var(--surface);
+  color: var(--inactive);
 }
 
 .segmented button {
@@ -855,7 +979,7 @@ main {
 }
 
 .segmented button.active {
-  background: var(--mint);
+  background: var(--brand);
   color: #fff;
   font-weight: 800;
 }
@@ -872,7 +996,14 @@ main {
   -webkit-tap-highlight-color: transparent;
 }
 
+.amount-field > span {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .amount-field input {
+  flex: 1 1 auto;
+  min-width: 0;
   width: 100%;
   border: 0;
   outline: 0;
@@ -897,7 +1028,7 @@ main {
   border: 0;
   border-radius: 999px;
   color: #fff;
-  background: var(--mint);
+  background: var(--brand);
   font-size: 24px;
   font-weight: 900;
   line-height: 1;
@@ -934,7 +1065,7 @@ main {
   border-radius: 999px;
   padding: 10px 14px;
   color: var(--mint-dark);
-  background: #fff;
+  background: var(--surface);
   font-weight: 900;
 }
 
@@ -948,7 +1079,7 @@ main {
 .chips button.active {
   border-color: currentColor;
   color: var(--mint-dark);
-  background: #fff;
+  background: var(--surface);
   font-weight: 800;
 }
 
@@ -987,8 +1118,8 @@ main {
 .primary-button {
   margin-top: 28px;
   color: #fff;
-  background: var(--mint);
-  box-shadow: 0 8px 18px rgba(16, 191, 168, 0.32);
+  background: var(--brand);
+  box-shadow: 0 8px 18px var(--brand-glow);
   font-size: 19px;
   text-transform: uppercase;
 }
@@ -1028,7 +1159,7 @@ main {
 
 .budget-card h3 {
   margin: 0;
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .budget-card input {
@@ -1036,7 +1167,53 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px;
+  color: var(--text);
+  background: var(--surface);
   text-align: right;
+}
+
+.budget-card .cap-input {
+  display: flex;
+  width: 112px;
+  align-items: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.budget-card .cap-input span {
+  padding-left: 9px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.budget-card .cap-input input {
+  min-width: 0;
+  flex: 1 1 auto;
+  width: 100%;
+  border: 0;
+  background: transparent;
+}
+
+.budget-card .cap-input:focus-within {
+  border-color: var(--mint);
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+
+.no-cap {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.progress-track.uncapped {
+  opacity: 0.55;
 }
 
 .calculated-total {
@@ -1077,8 +1254,27 @@ main {
   font-size: 16px;
 }
 
+.month-left > .budget-detail:first-child {
+  align-items: baseline;
+  font-weight: 700;
+}
+
+.month-left .per-day {
+  margin: 2px 0 0;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.month-left > .budget-detail:first-child strong {
+  font-size: 32px;
+  line-height: 1.1;
+  letter-spacing: -0.02em;
+}
+
 .month-left strong.amount-negative {
-  color: var(--pink);
+  color: var(--pink-text);
 }
 
 .cluster-editor-heading {
@@ -1109,7 +1305,7 @@ main {
   margin: 11px 0 8px;
   overflow: hidden;
   border-radius: 999px;
-  background: #e7e9ed;
+  background: var(--track);
 }
 
 .progress-track.compact {
@@ -1135,7 +1331,7 @@ main {
 
 .home-budget-row.expanded {
   border-radius: 8px;
-  background: #f8fffd;
+  background: var(--mint-tint);
 }
 
 .home-budget-labels {
@@ -1162,7 +1358,7 @@ main {
   border-radius: 8px;
   padding: 8px 10px;
   color: var(--muted);
-  background: #fff;
+  background: var(--surface);
   font-size: 13px;
   font-weight: 800;
 }
@@ -1178,7 +1374,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px 10px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .summary-category-detail .summary-category-total {
@@ -1271,7 +1467,7 @@ main {
   justify-content: center;
   margin-top: 10px;
   color: var(--text);
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   text-align: center;
 }
@@ -1285,14 +1481,14 @@ main {
   padding: 10px 14px;
   border-radius: 12px;
   color: var(--text);
-  background: #fff4dd;
+  background: var(--notice-bg);
   border: 1px solid var(--amber);
   font-size: 13px;
   line-height: 1.35;
 }
 
 .notice-error {
-  background: #fde8ed;
+  background: var(--error-bg);
   border-color: var(--pink);
 }
 
@@ -1317,7 +1513,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   color: var(--mint-dark);
-  background: #fff;
+  background: var(--surface);
   box-shadow: var(--shadow);
   text-align: center;
   font-weight: 900;
@@ -1327,8 +1523,8 @@ main {
   grid-column: 1 / -1;
   min-height: 68px;
   color: #fff;
-  background: var(--mint);
-  border-color: var(--mint);
+  background: var(--brand);
+  border-color: var(--brand);
 }
 
 .helper-text {
@@ -1394,7 +1590,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 12px;
-  background: #fff;
+  background: var(--surface);
   font: inherit;
 }
 
@@ -1457,7 +1653,7 @@ main {
   min-height: 52px;
   border-top: 1px solid var(--line);
   padding: 9px 10px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .earnings-row:first-child {
@@ -1504,7 +1700,7 @@ main {
 }
 
 .asset-header {
-  background: #c9f4d1;
+  background: var(--header-tint);
   padding: 10px;
   font-size: 13px;
   font-weight: 800;
@@ -1515,7 +1711,7 @@ main {
   border: 0;
   border-top: 1px solid var(--line);
   padding: 10px;
-  background: #fff;
+  background: var(--surface);
   text-align: left;
 }
 
@@ -1535,7 +1731,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 999px;
   color: var(--mint-dark);
-  background: #fff;
+  background: var(--surface);
   font-size: 13px;
   font-weight: 900;
   line-height: 1;
@@ -1552,7 +1748,7 @@ main {
   border: 1px solid var(--line);
   border-radius: 8px;
   padding: 8px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .asset-account-input {
@@ -1566,7 +1762,7 @@ main {
   overflow: hidden;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .asset-balance-input span {
@@ -1605,7 +1801,7 @@ main {
   left: 6px;
   width: 24px;
   height: 24px;
-  background: #ff3b35;
+  background: var(--danger-solid);
 }
 
 .remove-icon-button::after {
@@ -1613,7 +1809,7 @@ main {
   left: 12px;
   width: 12px;
   height: 3px;
-  background: #fff;
+  background: var(--surface);
 }
 
 .inline-actions {
@@ -1634,8 +1830,8 @@ main {
 }
 
 .small-action-button.danger {
-  color: #d92e28;
-  background: #fff3f2;
+  color: var(--danger-text);
+  background: var(--danger-bg);
 }
 
 .budget-actions {
@@ -1671,14 +1867,14 @@ main {
   margin: 0 auto;
   padding: 8px 8px max(8px, env(safe-area-inset-bottom));
   border-top: 1px solid var(--line);
-  background: #fff;
+  background: var(--surface);
 }
 
 .bottom-nav button {
   min-height: 54px;
   border: 0;
   border-radius: 8px;
-  color: #9297a0;
+  color: var(--inactive);
   background: transparent;
   font-size: 22px;
 }
@@ -1689,22 +1885,48 @@ main {
   font-size: 11px;
 }
 
+.bottom-nav button {
+  position: relative;
+}
+
 .bottom-nav button.active {
   color: var(--mint-dark);
   background: var(--mint-soft);
+  font-weight: 800;
+}
+
+.bottom-nav button.active::before {
+  position: absolute;
+  top: 0;
+  left: 22%;
+  right: 22%;
+  height: 3px;
+  content: "";
+  border-radius: 0 0 3px 3px;
+  background: var(--mint-dark);
+}
+
+.bottom-nav .add-tab.active {
+  color: #fff;
+  background: var(--brand);
+  box-shadow: inset 0 0 0 2px var(--surface), 0 0 0 2px var(--brand);
+}
+
+.bottom-nav .add-tab.active::before {
+  display: none;
 }
 
 .bottom-nav .add-tab {
   color: #fff;
-  background: var(--mint);
+  background: var(--brand);
 }
 
 @media (min-width: 560px) {
   body {
-    background: #dfe6ee;
+    background: var(--page-bg);
   }
 
   .app-shell {
-    box-shadow: 0 0 36px rgba(19, 30, 43, 0.14);
+    box-shadow: 0 0 36px var(--shell-shadow);
   }
 }
