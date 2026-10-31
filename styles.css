@@ -1068,6 +1068,19 @@ main {
   font-size: 16px;
 }
 
+.month-left {
+  padding-bottom: 12px;
+}
+
+.month-left strong {
+  color: var(--text);
+  font-size: 16px;
+}
+
+.month-left strong.amount-negative {
+  color: var(--pink);
+}
+
 .cluster-editor-heading {
   display: grid;
   grid-template-columns: 36px 1fr 36px;

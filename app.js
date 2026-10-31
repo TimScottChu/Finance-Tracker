@@ -5,6 +5,12 @@ const CURRENCY_STORAGE_KEY = "php-finance-tracker-currency-v1";
 const META_STORAGE_KEY = "php-finance-tracker-meta-v1";
 const PRE_IMPORT_STORAGE_KEY = "php-finance-tracker-pre-import-v1";
 const BACKUP_NUDGE_DAYS = 7;
+const PRE_MERGE_STORAGE_KEY = "php-finance-tracker-pre-merge-v1";
+const JPY_CATEGORY_MERGES = [
+  { from: "grocery", to: "groceries", name: "Groceries" },
+  { from: "medicines", to: "medicine", name: "Medicine" }
+];
+const JPY_ADDED_CATEGORIES = [{ id: "home-furnishing", name: "Home Furnishing", icon: "", budget: 0 }];
 const SUPPORTED_CURRENCIES = ["PHP", "JPY"];
 
 const DEFAULT_CATEGORIES = {
@@ -186,6 +192,10 @@ const els = {
   budgetClusterName: document.querySelector("#budget-cluster-name"),
   budgetClusterSpent: document.querySelector("#budget-cluster-spent"),
   budgetClusterRemaining: document.querySelector("#budget-cluster-remaining"),
+  budgetMonthLabel: document.querySelector("#budget-month-label"),
+  budgetMonthLeft: document.querySelector("#budget-month-left"),
+  budgetMonthProgress: document.querySelector("#budget-month-progress"),
+  budgetMonthSpent: document.querySelector("#budget-month-spent"),
   clusterActions: document.querySelector("#cluster-actions"),
   renameCluster: document.querySelector("#rename-cluster"),
   addCluster: document.querySelector("#add-cluster"),
@@ -230,6 +240,8 @@ initialize();
 
 function initialize() {
   requestPersistentStorage();
+  // Loading the JPY ledger runs its category merge even when PHP is active.
+  if (activeCurrency !== "JPY") loadState("JPY");
   ensureMonthBudget(currentMonth);
   setDateTimeDefaults();
   els.feedbackNotes.value = localStorage.getItem(FEEDBACK_STORAGE_KEY) || "";
@@ -1066,6 +1078,16 @@ function renderCardDetail() {
 
 function renderBudget() {
   const budget = state.budgets[currentMonth];
+  const monthBudgeted = sumBudgetClusters(budget);
+  const monthSpent = getMonthTotals(currentMonth).expense + getRecurringMonthTotal(currentMonth);
+  const monthLeft = monthBudgeted - monthSpent;
+  const monthPercent = monthBudgeted > 0 ? Math.round((monthSpent / monthBudgeted) * 100) : monthSpent > 0 ? 100 : 0;
+  els.budgetMonthLabel.textContent = `Left to spend in ${monthLong(currentMonth)}`;
+  els.budgetMonthLeft.textContent = formatMoney(monthLeft);
+  els.budgetMonthLeft.className = monthLeft < 0 ? "amount-negative" : "";
+  els.budgetMonthProgress.className = `progress-fill ${getBudgetStatusClass(monthPercent)}`;
+  els.budgetMonthProgress.style.setProperty("--width", `${Math.min(100, Math.max(0, monthPercent))}%`);
+  els.budgetMonthSpent.textContent = `Spent ${formatMoney(monthSpent)} of ${formatMoney(monthBudgeted)}`;
   const cluster = getActiveCluster(budget);
   const clusterTotals = getClusterTotals(currentMonth, cluster);
   els.budgetClusterName.textContent = cluster.name;
@@ -1923,7 +1945,9 @@ function importBackup(event) {
       }
       if (imported?.formatVersion === 2 && imported.ledgers?.PHP && imported.ledgers?.JPY) {
         const phpState = normalizeState(imported.ledgers.PHP);
+        const jpyJson = JSON.stringify(imported.ledgers.JPY);
         const jpyState = normalizeState(imported.ledgers.JPY);
+        if (migrateJpyCategories(jpyState)) savePreMergeSnapshot(jpyJson);
         setStoredItem(STORAGE_KEY, JSON.stringify(phpState));
         setStoredItem(JPY_STORAGE_KEY, JSON.stringify(jpyState));
         activeCurrency = SUPPORTED_CURRENCIES.includes(imported.activeCurrency) ? imported.activeCurrency : "PHP";
@@ -2137,12 +2161,70 @@ function ensureMonthBudget(monthKey) {
 
 function loadState(currency = activeCurrency) {
   const saved = localStorage.getItem(currency === "JPY" ? JPY_STORAGE_KEY : STORAGE_KEY);
-  if (!saved) return normalizeState(currency === "JPY" ? createBlankYenState() : {});
+  if (!saved) return createDefaultState(currency);
   try {
-    return normalizeState(JSON.parse(saved));
+    const loaded = normalizeState(JSON.parse(saved));
+    if (currency === "JPY" && migrateJpyCategories(loaded) && savePreMergeSnapshot(saved)) {
+      setStoredItem(JPY_STORAGE_KEY, JSON.stringify(loaded));
+    }
+    return loaded;
   } catch {
-    return normalizeState(currency === "JPY" ? createBlankYenState() : {});
+    return createDefaultState(currency);
   }
+}
+
+function createDefaultState(currency) {
+  if (currency !== "JPY") return normalizeState({});
+  const blank = normalizeState(createBlankYenState());
+  migrateJpyCategories(blank);
+  return blank;
+}
+
+function savePreMergeSnapshot(ledgerJson) {
+  if (localStorage.getItem(PRE_MERGE_STORAGE_KEY) !== null) return true;
+  return setStoredItem(PRE_MERGE_STORAGE_KEY, ledgerJson);
+}
+
+// JPY-only category cleanup. Returns true when the ledger changed; running it again is a no-op.
+function migrateJpyCategories(ledger) {
+  let changed = false;
+  const expense = ledger.categories.expense;
+  JPY_CATEGORY_MERGES.forEach(({ from, to, name }) => {
+    const source = expense.find((category) => category.id === from);
+    const target = expense.find((category) => category.id === to);
+    if (source && target) {
+      target.budget = (Number(target.budget) || 0) + (Number(source.budget) || 0);
+      expense.splice(expense.indexOf(source), 1);
+      changed = true;
+    } else if (source) {
+      source.id = to;
+      source.name = name;
+      changed = true;
+    }
+    [...ledger.transactions, ...ledger.recurringExpenses].forEach((item) => {
+      if (item.categoryId !== from) return;
+      item.categoryId = to;
+      changed = true;
+    });
+    Object.values(ledger.budgets).forEach((budget) => {
+      getBudgetClusters(budget, ledger.categories).forEach((cluster) => {
+        if (cluster.categories[from] === undefined) return;
+        if (cluster.categories[to] === undefined) {
+          cluster.categories = Object.fromEntries(Object.entries(cluster.categories).map(([id, cap]) => [id === from ? to : id, cap]));
+        } else {
+          cluster.categories[to] = (Number(cluster.categories[to]) || 0) + (Number(cluster.categories[from]) || 0);
+          delete cluster.categories[from];
+        }
+        changed = true;
+      });
+    });
+  });
+  JPY_ADDED_CATEGORIES.forEach((category) => {
+    if (expense.some((item) => item.id === category.id)) return;
+    expense.push(structuredClone(category));
+    changed = true;
+  });
+  return changed;
 }
 
 function createBlankYenState() {
@@ -2467,7 +2549,8 @@ function removeStoredItem(key) {
 }
 
 function showStorageError() {
-  els.storageError?.classList.remove("hidden");
+  // Queried directly because this can run while the initial state loads, before els exists.
+  document.querySelector("#storage-error")?.classList.remove("hidden");
 }
 
 function requestPersistentStorage() {
