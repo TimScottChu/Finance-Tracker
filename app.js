@@ -580,8 +580,6 @@ function renderHome() {
   const recurringTotal = getRecurringMonthTotal(currentMonth);
   els.homeIncome.innerHTML = moneyHtml(totals.income);
   els.homeExpenses.innerHTML = moneyHtml(totals.expense + recurringTotal);
-  setAmountLengthTier(els.homeIncome, totals.income);
-  setAmountLengthTier(els.homeExpenses, totals.expense + recurringTotal);
   renderHomeBudgetBars();
   renderSummaryRecurring();
   renderPaymentMethodTotals();
@@ -2641,12 +2639,6 @@ function formatMoney(value) {
 // Wraps a formatted amount so CSS can mask it when amounts are hidden.
 function moneyHtml(value) {
   return `<span class="money">${formatMoney(value)}</span>`;
-}
-
-// Render-only: tags an amount element with a length tier so CSS can shrink long numbers.
-function setAmountLengthTier(el, value) {
-  const length = formatMoney(value).length;
-  el.dataset.len = length <= 7 ? "short" : length <= 9 ? "medium" : "long";
 }
 
 function applyPrivacy() {
