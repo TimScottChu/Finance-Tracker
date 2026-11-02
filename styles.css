@@ -21,6 +21,7 @@
   --text-2: #3f4a5a;
   --summary-amount-size: 16px;
   --summary-amount-weight: 600;
+  --summary-amount-color: var(--text-2);
   --inactive: #6b7280;
   --line: #e7ebf0;
   --track: #e7e9ed;
@@ -273,6 +274,10 @@ main {
   padding: 14px;
 }
 
+.metric-grid article:nth-child(-n + 2) {
+  padding-inline: 12px;
+}
+
 .metric-heading {
   display: flex;
   align-items: center;
@@ -384,8 +389,20 @@ main {
   font-size: var(--summary-amount-size);
   font-weight: var(--summary-amount-weight);
   font-variant-numeric: tabular-nums;
+  color: var(--summary-amount-color);
   line-height: 1.2;
   overflow-wrap: anywhere;
+}
+
+/* Length tiers (data-len is set at render time from the formatted amount). */
+#home-income[data-len="medium"],
+#home-expenses[data-len="medium"] {
+  font-size: calc(var(--summary-amount-size) * 0.85);
+}
+
+#home-income[data-len="long"],
+#home-expenses[data-len="long"] {
+  font-size: calc(var(--summary-amount-size) * 0.7);
 }
 
 .payment-method-list {
@@ -1409,7 +1426,7 @@ textarea::placeholder {
 .home-budget-labels span {
   min-width: 0;
   margin-left: auto;
-  color: var(--text-2);
+  color: var(--summary-amount-color);
   font-weight: 500;
   text-align: right;
 }
