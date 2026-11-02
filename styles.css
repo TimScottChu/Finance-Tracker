@@ -275,45 +275,78 @@ main {
   gap: 8px;
 }
 
-.visibility-toggle {
-  position: relative;
-  width: 30px;
-  height: 24px;
+.topbar-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.privacy-toggle {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: -4px;
   border: 0;
   border-radius: 999px;
-  color: var(--mint-dark);
+  padding: 0;
+  color: #fff;
   background: transparent;
 }
 
-.visibility-toggle::before {
-  position: absolute;
-  inset: 6px 4px;
-  content: "";
-  border: 2px solid currentColor;
-  border-radius: 50% / 65%;
+.privacy-toggle:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: -2px;
+}
+
+.privacy-toggle .icon-eye-off,
+.privacy-toggle.is-hidden .icon-eye {
+  display: none;
+}
+
+.privacy-toggle.is-hidden .icon-eye-off {
+  display: block;
+}
+
+/* Privacy mask: covers the glyphs with a solid bar, so no digit is readable. */
+:root {
+  --mask: #c5cdd6;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --mask: #4a5662;
+  }
+}
+
+.amounts-hidden .money,
+.amounts-hidden [data-money-input]:not(:focus) {
+  border-radius: 4px;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  caret-color: transparent;
+  background: var(--mask) !important;
+  text-shadow: none !important;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.amounts-hidden .money::selection,
+.amounts-hidden [data-money-input]:not(:focus)::selection {
+  color: transparent;
   background: transparent;
 }
 
-.visibility-toggle::after {
-  position: absolute;
-  top: 10px;
-  left: 13px;
-  width: 6px;
-  height: 6px;
-  content: "";
-  border-radius: 999px;
-  background: currentColor;
+.amounts-hidden [data-money-input]:not(:focus)::placeholder {
+  color: transparent;
 }
 
-.visibility-toggle.hidden-values::after {
-  position: absolute;
-  top: 11px;
-  left: 5px;
-  width: 20px;
-  height: 2px;
-  content: "";
-  background: var(--pink);
-  transform: rotate(-35deg);
+.amounts-hidden #edit-transaction-amount {
+  border-radius: 4px;
+  color: transparent !important;
+  -webkit-text-fill-color: transparent;
+  background: var(--mask) !important;
 }
 
 .metric-button {
