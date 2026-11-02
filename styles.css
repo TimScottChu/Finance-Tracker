@@ -2050,3 +2050,17 @@ textarea::placeholder {
     box-shadow: 0 0 36px var(--shell-shadow);
   }
 }
+
+/*
+ * Amount wrappers (<span class="money">, see moneyHtml) must take their look from the
+ * parent element. Generic "<container> span" rules above (e.g. .metric-grid span,
+ * .summary-category-detail span, .payment-method-row span) would otherwise restyle them.
+ * Kept last, at specificity (0,1,1), so it wins ties against those rules; the more specific
+ * .money rules for the Summary/Budget lines and the privacy mask still apply on top.
+ */
+span.money {
+  display: inline;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+}
