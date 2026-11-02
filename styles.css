@@ -262,13 +262,20 @@ main {
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
   margin-top: 12px;
 }
 
 .metric-grid article {
+  min-width: 0;
   padding: 14px;
+  container-type: inline-size;
+}
+
+/* History card sits on its own row so Income/Expenses get room for large amounts. */
+.metric-grid article:last-child {
+  grid-column: 1 / -1;
 }
 
 .metric-heading {
@@ -374,6 +381,16 @@ main {
   display: block;
   margin-top: 5px;
   font-size: 19px;
+}
+
+/* Income / Expenses amounts: scale with card width, capped, wrap rather than clip. */
+#home-income,
+#home-expenses {
+  font-size: 22px;
+  font-size: clamp(16px, 15cqi, 26px);
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
 }
 
 .payment-method-list {
@@ -1702,7 +1719,11 @@ textarea::placeholder {
 }
 
 .asset-summary strong {
+  min-width: 0;
   font-size: 22px;
+  font-weight: 700;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 .asset-view-switch {
