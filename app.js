@@ -88,8 +88,7 @@ let transactionEditMode = false;
 let selectedDateDetailsOpen = false;
 let editingTransactionId = "";
 let selectedCardDetailId = "";
-let summaryValuesVisible = true;
-let assetsValuesVisible = true;
+let amountsHidden = false; // in-memory only; app always opens visible
 let assetsView = "assets";
 let incomeCategoryEditMode = false;
 let expandedSummaryCategoryId = "";
@@ -126,7 +125,7 @@ const els = {
   entryPaymentMethod: document.querySelector("#entry-payment-method"),
   categoryChips: document.querySelector("#category-chips"),
   typeButtons: document.querySelectorAll("#transaction-form [data-type]"),
-  privacyToggles: document.querySelectorAll("[data-privacy-toggle]"),
+  privacyToggle: document.querySelector("#privacy-toggle"),
   homeIncome: document.querySelector("#home-income"),
   homeExpenses: document.querySelector("#home-expenses"),
   openHistory: document.querySelector("#open-history"),
@@ -209,7 +208,6 @@ const els = {
   assetTotal: document.querySelector("#asset-total"),
   assetTitle: document.querySelector("#asset-title"),
   addAsset: document.querySelector("#add-asset"),
-  toggleAssetsVisibility: document.querySelector("#toggle-assets-visibility"),
   toggleAssetsEdit: document.querySelector("#toggle-assets-edit"),
   assetViewButtons: document.querySelectorAll("[data-assets-view]"),
   assetsPanel: document.querySelector("#assets-panel"),
@@ -247,6 +245,7 @@ function initialize() {
   setDateTimeDefaults();
   els.feedbackNotes.value = localStorage.getItem(FEEDBACK_STORAGE_KEY) || "";
   bindEvents();
+  applyPrivacy();
   render();
   renderBackupStatus();
 
@@ -287,11 +286,11 @@ function bindEvents() {
     expandedHistoryMonth = expandedHistoryMonth === row.dataset.historyMonth ? "" : row.dataset.historyMonth;
     renderHistory();
   });
-  els.privacyToggles.forEach((button) => {
-    button.addEventListener("click", () => {
-      summaryValuesVisible = !summaryValuesVisible;
-      renderHome();
-    });
+  els.privacyToggle.addEventListener("click", () => {
+    amountsHidden = !amountsHidden;
+    if (amountsHidden) assetsEditMode = false;
+    applyPrivacy();
+    renderAssets();
   });
   els.homeBudgetBars.addEventListener("click", (event) => {
     if (wasRecentSwipe()) return;
@@ -417,11 +416,6 @@ function bindEvents() {
   els.addCluster.addEventListener("click", addCluster);
   els.removeCluster.addEventListener("click", removeCluster);
   els.addAsset.addEventListener("click", addAsset);
-  els.toggleAssetsVisibility.addEventListener("click", () => {
-    assetsValuesVisible = !assetsValuesVisible;
-    if (!assetsValuesVisible) assetsEditMode = false;
-    renderAssets();
-  });
   els.toggleAssetsEdit.addEventListener("click", () => {
     assetsEditMode = !assetsEditMode;
     renderAssets();
@@ -584,12 +578,8 @@ function changeCurrency(currency) {
 function renderHome() {
   const totals = getMonthTotals(currentMonth);
   const recurringTotal = getRecurringMonthTotal(currentMonth);
-  els.homeIncome.textContent = formatPrivateMoney(totals.income);
-  els.homeExpenses.textContent = formatPrivateMoney(totals.expense + recurringTotal);
-  els.privacyToggles.forEach((button) => {
-    button.classList.toggle("hidden-values", !summaryValuesVisible);
-    button.setAttribute("aria-label", summaryValuesVisible ? "Hide summary values" : "Show summary values");
-  });
+  els.homeIncome.innerHTML = moneyHtml(totals.income);
+  els.homeExpenses.innerHTML = moneyHtml(totals.expense + recurringTotal);
   renderHomeBudgetBars();
   renderSummaryRecurring();
   renderPaymentMethodTotals();
@@ -603,7 +593,7 @@ function renderHomeBudgetBars() {
   const cluster = getActiveCluster(budget);
   const clusterTotals = getClusterTotals(currentMonth, cluster);
   els.summaryClusterName.textContent = cluster.name;
-  els.summaryClusterSpent.textContent = `Spent ${formatMoney(clusterTotals.spent)}`;
+  els.summaryClusterSpent.innerHTML = `Spent ${moneyHtml(clusterTotals.spent)}`;
   els.homeBudgetBars.innerHTML = getClusterCategoryIds(cluster)
     .map((categoryId) => {
       const category = findCategory("expense", categoryId);
@@ -622,8 +612,8 @@ function renderHomeBudgetBars() {
             <strong>${category?.name || "Uncategorized"}</strong>
             ${
               limit > 0
-                ? `<span class="${remaining < 0 ? "amount-negative" : ""}">${remaining < 0 ? "Over " : "Remaining "}${formatMoney(Math.abs(remaining))}</span>`
-                : `<span class="no-cap">No cap set · spent ${formatMoney(spent)}</span>`
+                ? `<span class="${remaining < 0 ? "amount-negative" : ""}">${remaining < 0 ? "Over " : "Remaining "}${moneyHtml(Math.abs(remaining))}</span>`
+                : `<span class="no-cap">No cap set · spent ${moneyHtml(spent)}</span>`
             }
           </div>
           <div class="progress-track compact ${limit > 0 ? "" : "uncapped"}">
@@ -632,7 +622,7 @@ function renderHomeBudgetBars() {
           ${
             isExpanded
               ? `<div class="summary-category-detail">
-                  <div class="summary-category-total">Month total <strong>${formatMoney(spent)}</strong></div>
+                  <div class="summary-category-total">Month total <strong>${moneyHtml(spent)}</strong></div>
                   ${
                     transactions.length || recurringItems.length
                       ? [
@@ -643,7 +633,7 @@ function renderHomeBudgetBars() {
                                   <strong>${escapeHtml(item.name)}</strong>
                                   <small>${escapeHtml(category?.name || "Uncategorized")} - ${formatShortDate(getRecurringDate(currentMonth, item))} recurring</small>
                                 </span>
-                                <strong>${formatMoney(item.amount)}</strong>
+                                <strong>${moneyHtml(item.amount)}</strong>
                               </span>
                             `
                           ),
@@ -655,7 +645,7 @@ function renderHomeBudgetBars() {
                                   <strong>${escapeHtml(item.note || category?.name || "Purchase")}</strong>
                                   <small>${escapeHtml(category?.name || "Uncategorized")} - ${formatShortDate(item.date)} ${item.time}</small>
                                 </span>
-                                <strong>${formatMoney(item.amount)}</strong>
+                                <strong>${moneyHtml(item.amount)}</strong>
                               </span>
                             `
                           )
@@ -682,7 +672,7 @@ function renderSummaryRecurring() {
     };
   });
   const total = rows.reduce((sum, row) => sum + row.total, 0);
-  els.summaryRecurringTotal.textContent = formatMoney(total);
+  els.summaryRecurringTotal.innerHTML = moneyHtml(total);
   els.summaryRecurringToggle.setAttribute("aria-label", `${summaryRecurringOpen ? "Hide" : "Show"} recurring group totals`);
   els.summaryRecurringList.classList.toggle("hidden", !summaryRecurringOpen);
   els.summaryRecurringList.innerHTML = rows.some((row) => row.total)
@@ -695,7 +685,7 @@ function renderSummaryRecurring() {
                 <strong>${escapeHtml(row.cluster.name)}</strong>
                 <small>${row.count} recurring item${row.count === 1 ? "" : "s"}</small>
               </span>
-              <strong>${formatMoney(row.total)}</strong>
+              <strong>${moneyHtml(row.total)}</strong>
             </div>
           `
         )
@@ -732,8 +722,8 @@ function renderCalendar() {
     cells.push(`
       <button class="calendar-cell ${level ? `spend-${level}` : ""} ${dateKey === todayKey ? "today" : ""} ${dateKey === selectedDate && selectedDateDetailsOpen ? "selected" : ""}" type="button" data-date="${dateKey}">
         <strong>${day}</strong>
-        ${spent ? `<small>-${compactMoney(spent)}</small>` : ""}
-        ${expected ? `<small class="expected">Exp -${compactMoney(expected)}</small>` : ""}
+        ${spent ? `<small>-<span class="money">${compactMoney(spent)}</span></small>` : ""}
+        ${expected ? `<small class="expected">Exp -<span class="money">${compactMoney(expected)}</span></small>` : ""}
       </button>
     `);
   }
@@ -754,7 +744,7 @@ function renderSelectedDateTransactions() {
   const expectedItems = getRecurringExpensesForDate(selectedDate, filter);
 
   els.selectedDateTitle.textContent = formatDisplayDate(selectedDate);
-  els.selectedDateTotal.textContent = formatMoney(expenseTotal + expectedItems.reduce((sum, item) => sum + item.amount, 0));
+  els.selectedDateTotal.innerHTML = moneyHtml(expenseTotal + expectedItems.reduce((sum, item) => sum + item.amount, 0));
   els.toggleTransactionEdit.textContent = transactionEditMode ? "Done" : "Edit";
   els.toggleTransactionEdit.classList.toggle("hidden", !items.length);
   const expectedMarkup = expectedItems.length
@@ -850,7 +840,7 @@ function renderPaymentMethodTotals() {
             <strong>${escapeHtml(card.name)}</strong>
             <small>${formatShortDate(period.start)} - ${formatShortDate(period.end)}</small>
           </span>
-          <strong>${formatMoney(total)}</strong>
+          <strong>${moneyHtml(total)}</strong>
         </button>
       `;
     })
@@ -861,7 +851,7 @@ function renderRecurringExpenses() {
   const activeCluster = getActiveCluster(state.budgets[currentMonth]);
   const items = getRecurringExpensesForCluster(activeCluster.id);
   const total = items.reduce((sum, item) => sum + item.amount, 0);
-  els.recurringTotal.textContent = formatMoney(total);
+  els.recurringTotal.innerHTML = moneyHtml(total);
   els.toggleRecurringEdit.textContent = recurringEditMode ? "Done" : "Edit";
   els.addRecurring.classList.toggle("hidden", !recurringEditMode);
   els.recurringSummary.setAttribute("aria-label", `${recurringDetailsOpen ? "Hide" : "Show"} recurring details for ${activeCluster.name}`);
@@ -918,7 +908,7 @@ function renderRecurringExpenses() {
                       <strong>${escapeHtml(item.name)}</strong>
                       <small>Day ${item.dueDay} - ${escapeHtml(category?.name || "Uncategorized")} - ${escapeHtml(item.paymentMethod)}${item.note ? ` - ${escapeHtml(item.note)}` : ""}</small>
                     </span>
-                    <strong>${formatMoney(item.amount)}</strong>
+                    <strong>${moneyHtml(item.amount)}</strong>
                   `
               }
             </div>
@@ -1065,7 +1055,7 @@ function renderCardDetail() {
   els.cardDetailTitle.textContent = `${card.name} transactions`;
   els.cardCutoffDay.value = card.cutoffDay;
   els.cardDetailPeriod.textContent = `${formatDisplayDate(period.start)} - ${formatDisplayDate(period.end)}`;
-  els.cardDetailTotal.textContent = formatMoney(total);
+  els.cardDetailTotal.innerHTML = moneyHtml(total);
   els.cardDetailList.innerHTML = transactions.length
     ? transactions
         .map((item) => {
@@ -1078,7 +1068,7 @@ function renderCardDetail() {
                 <strong>${escapeHtml(purchaseName)}</strong>
                 <small>${escapeHtml(detail)}</small>
               </div>
-              <strong class="amount-negative">-${formatMoney(item.amount)}</strong>
+              <strong class="amount-negative">-${moneyHtml(item.amount)}</strong>
             </article>
           `;
         })
@@ -1098,11 +1088,11 @@ function getPerDayInfo(left, caps, monthKey, now = new Date()) {
 function renderPerDay(left, caps) {
   const info = getPerDayInfo(left, caps, currentMonth);
   els.budgetPerDay.classList.toggle("hidden", !info);
-  els.budgetPerDay.textContent = !info
+  els.budgetPerDay.innerHTML = !info
     ? ""
     : info.empty
       ? "No budget left this month"
-      : `${formatMoney(info.perDay)} / day for ${info.days} day${info.days === 1 ? "" : "s"}`;
+      : `${moneyHtml(info.perDay)} / day for ${info.days} day${info.days === 1 ? "" : "s"}`;
 }
 
 function renderBudget() {
@@ -1112,17 +1102,17 @@ function renderBudget() {
   const monthLeft = monthBudgeted - monthSpent;
   const monthPercent = monthBudgeted > 0 ? Math.round((monthSpent / monthBudgeted) * 100) : monthSpent > 0 ? 100 : 0;
   els.budgetMonthLabel.textContent = `Left to spend in ${monthLong(currentMonth)}`;
-  els.budgetMonthLeft.textContent = formatMoney(monthLeft);
+  els.budgetMonthLeft.innerHTML = moneyHtml(monthLeft);
   els.budgetMonthLeft.className = monthLeft < 0 ? "amount-negative" : "";
   els.budgetMonthProgress.className = `progress-fill ${getBudgetStatusClass(monthPercent)}`;
   els.budgetMonthProgress.style.setProperty("--width", `${Math.min(100, Math.max(0, monthPercent))}%`);
   renderPerDay(monthLeft, monthBudgeted);
-  els.budgetMonthSpent.textContent = `Spent ${formatMoney(monthSpent)} of ${formatMoney(monthBudgeted)}`;
+  els.budgetMonthSpent.innerHTML = `Spent ${moneyHtml(monthSpent)} of ${moneyHtml(monthBudgeted)}`;
   const cluster = getActiveCluster(budget);
   const clusterTotals = getClusterTotals(currentMonth, cluster);
   els.budgetClusterName.textContent = cluster.name;
-  els.budgetClusterSpent.textContent = `Spent ${formatMoney(clusterTotals.spent)}`;
-  els.budgetClusterRemaining.textContent = `${clusterTotals.remaining < 0 ? "Over" : "Remaining"} ${formatMoney(Math.abs(clusterTotals.remaining))}`;
+  els.budgetClusterSpent.innerHTML = `Spent ${moneyHtml(clusterTotals.spent)}`;
+  els.budgetClusterRemaining.innerHTML = `${clusterTotals.remaining < 0 ? "Over" : "Remaining"} ${moneyHtml(Math.abs(clusterTotals.remaining))}`;
   els.budgetClusterRemaining.className = clusterTotals.remaining < 0 ? "amount-negative" : "";
   els.toggleCategoryEdit.textContent = categoryEditMode ? "Done" : "Edit categories";
   els.clusterActions.classList.toggle("hidden", !categoryEditMode);
@@ -1156,17 +1146,17 @@ function renderBudget() {
           ${
             limit > 0
               ? `<div class="budget-detail">
-            <span>${percent}% of ${formatMoney(limit)}</span>
+            <span>${percent}% of ${moneyHtml(limit)}</span>
             <strong class="${remaining < 0 ? "amount-negative" : ""}">
-              ${remaining < 0 ? "Over " : "Left "}${formatMoney(Math.abs(remaining))}
+              ${remaining < 0 ? "Over " : "Left "}${moneyHtml(Math.abs(remaining))}
             </strong>
           </div>
           <div class="budget-detail">
-            <span>Spent ${formatMoney(spent)}</span>
-            <span>Budget ${formatMoney(limit)}</span>
+            <span>Spent ${moneyHtml(spent)}</span>
+            <span>Budget ${moneyHtml(limit)}</span>
           </div>`
               : `<div class="budget-detail">
-            <strong class="no-cap">No cap set · spent ${formatMoney(spent)}</strong>
+            <strong class="no-cap">No cap set · spent ${moneyHtml(spent)}</strong>
           </div>`
           }
         </article>
@@ -1218,9 +1208,9 @@ function renderHistory() {
   const totalDifference = totalBudgeted - totalSpent;
 
   els.historyYear.textContent = historyYear;
-  els.historyBudgeted.textContent = formatMoney(totalBudgeted);
-  els.historySpent.textContent = formatMoney(totalSpent);
-  els.historyDifference.textContent = formatMoney(totalDifference);
+  els.historyBudgeted.innerHTML = moneyHtml(totalBudgeted);
+  els.historySpent.innerHTML = moneyHtml(totalSpent);
+  els.historyDifference.innerHTML = moneyHtml(totalDifference);
   els.historyDifference.className = totalDifference < 0 ? "amount-negative" : "";
   els.historyList.innerHTML = monthRows
     .map((row) => {
@@ -1231,22 +1221,22 @@ function renderHistory() {
       return `
       <button class="history-row ${isExpanded ? "expanded" : ""}" type="button" data-history-month="${row.monthKey}">
         <strong>${row.monthName}${overspent.length ? " *" : ""}</strong>
-        <span>Budgeted ${formatMoney(row.budgeted)}</span>
-        <span>Spent ${formatMoney(row.spent)}</span>
+        <span>Budgeted ${moneyHtml(row.budgeted)}</span>
+        <span>Spent ${moneyHtml(row.spent)}</span>
         <span class="${row.difference < 0 ? "amount-negative" : ""}">
-          ${row.difference < 0 ? "Over " : "Left "}${formatMoney(Math.abs(row.difference))}
+          ${row.difference < 0 ? "Over " : "Left "}${moneyHtml(Math.abs(row.difference))}
         </span>
         ${
           isExpanded
             ? `<div class="history-insight">
                 ${
                   overspent.length
-                    ? `<strong>Overspent</strong>${overspent.map((item) => `<span>${escapeHtml(item.name)} +${formatMoney(item.amount)}</span>`).join("")}`
+                    ? `<strong>Overspent</strong>${overspent.map((item) => `<span>${escapeHtml(item.name)} +${moneyHtml(item.amount)}</span>`).join("")}`
                     : ""
                 }
                 ${
                   saved.length
-                    ? `<strong class="saved">Saved</strong>${saved.map((item) => `<span class="saved">${escapeHtml(item.name)} ${formatMoney(item.amount)}</span>`).join("")}`
+                    ? `<strong class="saved">Saved</strong>${saved.map((item) => `<span class="saved">${escapeHtml(item.name)} ${moneyHtml(item.amount)}</span>`).join("")}`
                     : ""
                 }
                 ${!overspent.length && !saved.length ? `<span>No category budget details yet.</span>` : ""}
@@ -1266,11 +1256,9 @@ function renderAssets() {
   const total = state.assets.reduce((sum, asset) => sum + asset.balance, 0);
   const trackerDate = state.assetUpdatedAt || latestAssetDate();
   els.assetTitle.textContent = `Asset tracker (${formatDisplayDate(trackerDate)})`;
-  els.assetTotal.textContent = formatAssetMoney(total);
-  els.toggleAssetsVisibility.classList.toggle("hidden-values", !assetsValuesVisible);
-  els.toggleAssetsVisibility.setAttribute("aria-label", assetsValuesVisible ? "Hide asset values" : "Show asset values");
+  els.assetTotal.innerHTML = moneyHtml(total);
   els.toggleAssetsEdit.textContent = assetsEditMode ? "Done" : "Edit";
-  els.toggleAssetsEdit.classList.toggle("hidden", !assetsValuesVisible);
+  els.toggleAssetsEdit.classList.toggle("hidden", amountsHidden);
   els.addAsset.classList.toggle("hidden", !assetsEditMode);
   els.assetsList.innerHTML = `
     <div class="asset-header ${assetsEditMode ? "editing" : ""}">
@@ -1284,12 +1272,12 @@ function renderAssets() {
           ${
             assetsEditMode
               ? `<input class="asset-account-input" value="${escapeAttribute(asset.account)}" data-asset-field="account" data-asset="${asset.id}" aria-label="Account name" />`
-              : `<strong>${assetsValuesVisible ? escapeHtml(asset.account) : "Asset"}</strong>`
+              : `<strong>${amountsHidden ? "Asset" : escapeHtml(asset.account)}</strong>`
           }
           ${
             assetsEditMode
               ? `<label class="asset-balance-input"><span>${activeCurrency}</span><input inputmode="decimal" value="${formatInputMoney(asset.balance)}" data-money-input data-asset-field="balance" data-asset="${asset.id}" aria-label="${escapeAttribute(asset.account)} balance" /></label>`
-              : `<span>${formatAssetMoney(asset.balance)}</span>`
+              : `<span>${moneyHtml(asset.balance)}</span>`
           }
           ${
             assetsEditMode
@@ -1311,7 +1299,7 @@ function renderEarnings() {
   const categories = state.categories.income.filter((category) => category.active !== false || (categoryTotals[category.id] || 0) > 0);
   const total = Object.values(categoryTotals).reduce((sum, amount) => sum + amount, 0);
   els.earningsMonthLabel.textContent = monthLong(currentMonth);
-  els.earningsTotal.textContent = formatMoney(total);
+  els.earningsTotal.innerHTML = moneyHtml(total);
   els.toggleIncomeCategoriesEdit.textContent = incomeCategoryEditMode ? "Done" : "Edit categories";
   els.addIncomeCategory.classList.toggle("hidden", !incomeCategoryEditMode);
   els.earningsList.innerHTML = categories.length
@@ -1325,7 +1313,7 @@ function renderEarnings() {
                   ? `<input class="category-name-input" value="${escapeAttribute(category.name)}" data-income-category-field="name" data-income-category="${category.id}" aria-label="${escapeAttribute(category.name)} name" />`
                   : `<span><strong>${escapeHtml(category.name)}</strong>${archived ? "<small>Archived</small>" : ""}</span>`
               }
-              <strong>${formatMoney(categoryTotals[category.id] || 0)}</strong>
+              <strong>${moneyHtml(categoryTotals[category.id] || 0)}</strong>
               ${
                 incomeCategoryEditMode && !archived
                   ? `<button class="remove-icon-button" type="button" data-income-category-remove="${category.id}" aria-label="Remove ${escapeAttribute(category.name)}"></button>`
@@ -1528,7 +1516,7 @@ function transactionTemplate(item) {
         <strong>${escapeHtml(purchaseName)}</strong>
         <small>${details}</small>
       </div>
-      <strong class="${amountClass}">${sign}${formatMoney(item.amount)}</strong>
+      <strong class="${amountClass}">${sign}${moneyHtml(item.amount)}</strong>
     </article>
   `;
 }
@@ -1542,7 +1530,7 @@ function expectedRecurringTemplate(item) {
         <strong>${escapeHtml(item.name)}</strong>
         <small>${escapeHtml(group.name)} - ${escapeHtml(category?.name || "Uncategorized")} - ${escapeHtml(item.paymentMethod)}</small>
       </div>
-      <strong class="amount-negative">-${formatMoney(item.amount)}</strong>
+      <strong class="amount-negative">-${moneyHtml(item.amount)}</strong>
     </article>
   `;
 }
@@ -2648,12 +2636,16 @@ function formatMoney(value) {
   return moneyFormatters[activeCurrency].format(value);
 }
 
-function formatPrivateMoney(value) {
-  return summaryValuesVisible ? formatMoney(value) : "---";
+// Wraps a formatted amount so CSS can mask it when amounts are hidden.
+function moneyHtml(value) {
+  return `<span class="money">${formatMoney(value)}</span>`;
 }
 
-function formatAssetMoney(value) {
-  return assetsValuesVisible ? formatMoney(value) : "---";
+function applyPrivacy() {
+  document.body.classList.toggle("amounts-hidden", amountsHidden);
+  els.privacyToggle.setAttribute("aria-pressed", String(amountsHidden));
+  els.privacyToggle.setAttribute("aria-label", amountsHidden ? "Show amounts" : "Hide amounts");
+  els.privacyToggle.classList.toggle("is-hidden", amountsHidden);
 }
 
 function compactMoney(value) {

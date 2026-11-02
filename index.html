@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <title>Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=38" />
+    <link rel="stylesheet" href="styles.css?v=39" />
   </head>
   <body>
     <div class="app-shell">
@@ -17,13 +17,26 @@
           <p class="eyebrow">Personal tracker</p>
           <h1 id="screen-title">Summary</h1>
         </div>
-        <label class="currency-picker">
-          <span>Currency</span>
-          <select id="currency-select" aria-label="Currency ledger">
-            <option value="PHP">PHP</option>
-            <option value="JPY">JPY</option>
-          </select>
-        </label>
+        <div class="topbar-actions">
+          <button class="privacy-toggle" id="privacy-toggle" type="button" aria-label="Hide amounts" aria-pressed="false">
+            <svg class="icon-eye" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" />
+              <circle cx="12" cy="12" r="3" />
+            </svg>
+            <svg class="icon-eye-off" viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+              <path d="M1.5 12S5.5 5 12 5s10.5 7 10.5 7-4 7-10.5 7S1.5 12 1.5 12z" />
+              <circle cx="12" cy="12" r="3" />
+              <path d="M3 3l18 18" />
+            </svg>
+          </button>
+          <label class="currency-picker">
+            <span>Currency</span>
+            <select id="currency-select" aria-label="Currency ledger">
+              <option value="PHP">PHP</option>
+              <option value="JPY">JPY</option>
+            </select>
+          </label>
+        </div>
       </header>
 
       <p class="app-notice notice-error hidden" id="storage-error" role="alert">
@@ -37,14 +50,12 @@
             <article>
               <div class="metric-heading">
                 <span>Income</span>
-                <button class="visibility-toggle" type="button" data-privacy-toggle aria-label="Hide summary values"></button>
               </div>
               <strong id="home-income">PHP 0.00</strong>
             </article>
             <article>
               <div class="metric-heading">
                 <span>Expenses</span>
-                <button class="visibility-toggle" type="button" data-privacy-toggle aria-label="Hide summary values"></button>
               </div>
               <strong id="home-expenses">PHP 0.00</strong>
             </article>
@@ -250,7 +261,6 @@
             <div class="section-heading">
               <h2 id="asset-title">Asset tracker</h2>
               <div class="inline-actions">
-                <button class="visibility-toggle" id="toggle-assets-visibility" type="button" aria-label="Hide asset values"></button>
                 <button class="text-button" id="toggle-assets-edit" type="button">Edit</button>
               </div>
             </div>
@@ -282,7 +292,7 @@
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v38</p>
+          <p class="app-version">App version v39</p>
           <p class="app-version" id="last-backup">Last backup: never</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
@@ -430,6 +440,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=38"></script>
+    <script src="app.js?v=39"></script>
   </body>
 </html>
