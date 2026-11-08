@@ -84,6 +84,7 @@ let recurringEditMode = false;
 let recurringDetailsOpen = false;
 let summaryRecurringOpen = false;
 let editingRecurringId = "";
+let confirmingRecurring = null; // { itemId, monthKey } while the Summary recurring sheet is open
 let transactionEditMode = false;
 let selectedDateDetailsOpen = false;
 let editingTransactionId = "";
@@ -162,6 +163,15 @@ const els = {
   transactionModal: document.querySelector("#transaction-modal"),
   transactionEditForm: document.querySelector("#transaction-edit-form"),
   closeTransactionModal: document.querySelector("#close-transaction-modal"),
+  recurringConfirmModal: document.querySelector("#recurring-confirm-modal"),
+  recurringConfirmForm: document.querySelector("#recurring-confirm-form"),
+  closeRecurringConfirm: document.querySelector("#close-recurring-confirm"),
+  recurringConfirmTitle: document.querySelector("#recurring-confirm-title"),
+  recurringConfirmDue: document.querySelector("#recurring-confirm-due"),
+  recurringConfirmPrefix: document.querySelector("#recurring-confirm-prefix"),
+  recurringConfirmAmount: document.querySelector("#recurring-confirm-amount"),
+  recurringConfirmSubmit: document.querySelector("#recurring-confirm-submit"),
+  recurringConfirmUndo: document.querySelector("#recurring-confirm-undo"),
   cardDetailModal: document.querySelector("#card-detail-modal"),
   closeCardDetail: document.querySelector("#close-card-detail"),
   cardDetailTitle: document.querySelector("#card-detail-title"),
@@ -270,6 +280,16 @@ function bindEvents() {
   els.summaryRecurringToggle.addEventListener("click", () => {
     summaryRecurringOpen = !summaryRecurringOpen;
     renderSummaryRecurring();
+  });
+  els.summaryRecurringList.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-summary-recurring]");
+    if (row) openRecurringConfirm(row.dataset.summaryRecurring);
+  });
+  els.recurringConfirmForm.addEventListener("submit", saveRecurringConfirm);
+  els.recurringConfirmUndo.addEventListener("click", undoRecurringConfirm);
+  els.closeRecurringConfirm.addEventListener("click", closeRecurringConfirm);
+  els.recurringConfirmModal.addEventListener("click", (event) => {
+    if (event.target === els.recurringConfirmModal) closeRecurringConfirm();
   });
   els.openHistory.addEventListener("click", () => showScreen("history-screen"));
   els.backSummary.addEventListener("click", () => showScreen("summary-screen"));
@@ -570,6 +590,7 @@ function changeCurrency(currency) {
   assetsEditMode = false;
   incomeCategoryEditMode = false;
   closeTransactionModal();
+  closeRecurringConfirm();
   closeCardDetail();
   closeCalculator();
   els.amount.value = "";
@@ -607,7 +628,7 @@ function renderHomeBudgetBars() {
       const statusClass = getBudgetStatusClass(percent);
       const isExpanded = expandedSummaryCategoryId === categoryId;
       const transactions = isExpanded ? getCategoryTransactions(currentMonth, categoryId, cluster.id) : [];
-      const recurringItems = isExpanded ? getRecurringExpensesForCategory(cluster.id, categoryId) : [];
+      const recurringItems = isExpanded ? getRecurringExpensesForCategory(cluster.id, categoryId, currentMonth) : [];
       return `
         <button class="home-budget-row ${isExpanded ? "expanded" : ""}" type="button" data-summary-category="${categoryId}">
           <div class="home-budget-labels">
@@ -665,34 +686,121 @@ function renderHomeBudgetBars() {
 
 function renderSummaryRecurring() {
   const clusters = getBudgetClusters(state.budgets[currentMonth]);
+  // Each item counts its confirmed payment for this month if there is one, otherwise its expected amount.
   const rows = clusters.map((cluster) => {
-    const items = getRecurringExpensesForCluster(cluster.id);
+    const items = getRecurringExpensesForCluster(cluster.id).map((item) => {
+      const payment = getRecurringPayment(item, currentMonth);
+      return { item, payment, counted: payment ? payment.amount : item.amount };
+    });
     return {
       cluster,
-      count: items.length,
-      total: items.reduce((sum, item) => sum + item.amount, 0)
+      items,
+      total: items.reduce((sum, entry) => sum + entry.counted, 0)
     };
   });
   const total = rows.reduce((sum, row) => sum + row.total, 0);
   els.summaryRecurringTotal.innerHTML = moneyHtml(total);
-  els.summaryRecurringToggle.setAttribute("aria-label", `${summaryRecurringOpen ? "Hide" : "Show"} recurring group totals`);
+  els.summaryRecurringToggle.setAttribute("aria-label", `${summaryRecurringOpen ? "Hide" : "Show"} recurring bills`);
   els.summaryRecurringList.classList.toggle("hidden", !summaryRecurringOpen);
-  els.summaryRecurringList.innerHTML = rows.some((row) => row.total)
+  els.summaryRecurringList.innerHTML = rows.some((row) => row.items.length)
     ? rows
-        .filter((row) => row.total)
+        .filter((row) => row.items.length)
         .map(
           (row) => `
             <div class="recurring-row compact">
               <span>
                 <strong>${escapeHtml(row.cluster.name)}</strong>
-                <small>${row.count} recurring item${row.count === 1 ? "" : "s"}</small>
+                <small>${row.items.length} recurring item${row.items.length === 1 ? "" : "s"}</small>
               </span>
               <strong>${moneyHtml(row.total)}</strong>
             </div>
+            ${row.items.map(summaryRecurringItemTemplate).join("")}
           `
         )
         .join("")
     : `<p class="empty">No recurring expenses yet.</p>`;
+}
+
+function summaryRecurringItemTemplate({ item, payment }) {
+  const dueDate = getRecurringDate(currentMonth, item);
+  return `
+    <button class="recurring-row recurring-item-row ${payment ? "paid" : ""}" type="button" data-summary-recurring="${escapeAttribute(item.id)}">
+      <span>
+        <strong>${escapeHtml(item.name)}</strong>
+        <small>Due ${formatShortDate(dueDate)}</small>
+      </span>
+      <strong class="recurring-status">${
+        payment ? `Paid ${moneyHtml(payment.amount)} <span aria-hidden="true">✓</span>` : `Expected ${moneyHtml(item.amount)}`
+      }</strong>
+    </button>
+  `;
+}
+
+function openRecurringConfirm(itemId) {
+  const item = state.recurringExpenses.find((expense) => expense.id === itemId);
+  if (!item) return;
+  const payment = getRecurringPayment(item, currentMonth);
+  confirmingRecurring = { itemId, monthKey: currentMonth };
+  els.recurringConfirmTitle.textContent = item.name;
+  els.recurringConfirmDue.textContent = `Due ${formatDisplayDate(getRecurringDate(currentMonth, item))}${payment ? " · Paid" : ""}`;
+  els.recurringConfirmPrefix.textContent = `- ${activeCurrency}`;
+  els.recurringConfirmAmount.value = formatInputMoney(payment ? payment.amount : item.amount);
+  els.recurringConfirmSubmit.textContent = payment ? "Save amount" : "Confirm";
+  els.recurringConfirmUndo.classList.toggle("hidden", !payment);
+  els.recurringConfirmModal.classList.remove("hidden");
+}
+
+function closeRecurringConfirm() {
+  confirmingRecurring = null;
+  els.recurringConfirmModal.classList.add("hidden");
+}
+
+function saveRecurringConfirm(event) {
+  event.preventDefault();
+  if (!confirmingRecurring) return;
+  const { itemId, monthKey } = confirmingRecurring;
+  const item = state.recurringExpenses.find((expense) => expense.id === itemId);
+  const amount = parseEntryAmount(els.recurringConfirmAmount.value);
+  if (!item || !amount) return;
+  const payment = getRecurringPayment(item, monthKey);
+  if (payment) {
+    payment.amount = amount;
+  } else {
+    state.transactions.push(createRecurringPayment(item, monthKey, amount));
+  }
+  persist();
+  closeRecurringConfirm();
+  render();
+}
+
+// A normal expense transaction plus one optional field, recurringId, linking it to its template.
+function createRecurringPayment(item, monthKey, amount, now = new Date()) {
+  return {
+    id: crypto.randomUUID(),
+    type: "expense",
+    amount,
+    categoryId: item.categoryId,
+    clusterId: item.clusterId,
+    paymentMethod: item.paymentMethod,
+    note: item.name,
+    date: getRecurringDate(monthKey, item),
+    time: now.toTimeString().slice(0, 5),
+    createdAt: now.toISOString(),
+    recurringId: item.id
+  };
+}
+
+function undoRecurringConfirm() {
+  if (!confirmingRecurring) return;
+  const { itemId, monthKey } = confirmingRecurring;
+  const item = state.recurringExpenses.find((expense) => expense.id === itemId);
+  const payment = item && getRecurringPayment(item, monthKey);
+  if (!payment) return;
+  if (!confirm("Undo this payment? The expected charge will return.")) return;
+  state.transactions = state.transactions.filter((transaction) => transaction.id !== payment.id);
+  persist();
+  closeRecurringConfirm();
+  render();
 }
 
 function renderCalendar() {
@@ -2060,7 +2168,7 @@ function getCreditCardTransactions(cardId, monthKey) {
 function getRecurringCreditCardEntries(card, period) {
   const months = new Set([period.start.slice(0, 7), period.end.slice(0, 7)]);
   return [...months].flatMap((monthKey) =>
-    state.recurringExpenses
+    getExpectedRecurringExpenses(monthKey)
       .filter((item) => item.paymentMethod === card.method)
       .map((item) => ({
         ...item,
@@ -2136,7 +2244,9 @@ function getCategorySpent(monthKey, categoryId, clusterId = "", options = {}) {
       return getTransactionClusterId(item) === clusterId;
     })
     .reduce((sum, item) => sum + item.amount, 0);
-  const recurringTotal = options.includeRecurring ? getRecurringExpensesForCategory(clusterId, categoryId).reduce((sum, item) => sum + item.amount, 0) : 0;
+  const recurringTotal = options.includeRecurring
+    ? getRecurringExpensesForCategory(clusterId, categoryId, monthKey).reduce((sum, item) => sum + item.amount, 0)
+    : 0;
   return transactionTotal + recurringTotal;
 }
 
@@ -2490,14 +2600,28 @@ function getRecurringExpensesForCluster(clusterId) {
     .sort((a, b) => a.dueDay - b.dueDay || a.name.localeCompare(b.name));
 }
 
-function getRecurringExpensesForCategory(clusterId, categoryId) {
-  return state.recurringExpenses
+// With monthKey, leaves out items already paid (confirmed) in that month.
+function getRecurringExpensesForCategory(clusterId, categoryId, monthKey = "") {
+  return (monthKey ? getExpectedRecurringExpenses(monthKey) : state.recurringExpenses)
     .filter((item) => item.clusterId === clusterId && item.categoryId === categoryId)
     .sort((a, b) => a.dueDay - b.dueDay || a.name.localeCompare(b.name));
 }
 
+// The expense transaction that confirms this recurring item for the month, if any.
+// Its amount is already counted as a normal transaction, so the expected charge must not be.
+function getRecurringPayment(item, monthKey) {
+  return state.transactions.find(
+    (transaction) => transaction.recurringId === item.id && transaction.type === "expense" && transaction.date?.startsWith(monthKey)
+  );
+}
+
+// Recurring items still expected (not yet confirmed) in the given month.
+function getExpectedRecurringExpenses(monthKey) {
+  return state.recurringExpenses.filter((item) => !getRecurringPayment(item, monthKey));
+}
+
 function getRecurringMonthTotal(monthKey, filter = {}) {
-  return state.recurringExpenses
+  return getExpectedRecurringExpenses(monthKey)
     .filter((item) => recurringMatchesFilter(item, filter))
     .reduce((sum, item) => sum + item.amount, 0);
 }
@@ -2511,7 +2635,7 @@ function getRecurringDate(monthKey, item) {
 
 function getRecurringExpensesForDate(dateKey, filter = {}) {
   const monthKey = dateKey.slice(0, 7);
-  return state.recurringExpenses
+  return getExpectedRecurringExpenses(monthKey)
     .filter((item) => getRecurringDate(monthKey, item) === dateKey)
     .filter((item) => recurringMatchesFilter(item, filter))
     .sort((a, b) => a.name.localeCompare(b.name));

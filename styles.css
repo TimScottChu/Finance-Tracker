@@ -353,7 +353,8 @@ main {
   color: transparent;
 }
 
-.amounts-hidden #edit-transaction-amount {
+.amounts-hidden #edit-transaction-amount,
+.amounts-hidden #recurring-confirm-amount {
   border-radius: 4px;
   color: transparent !important;
   -webkit-text-fill-color: transparent;
@@ -607,6 +608,54 @@ main {
 .recurring-row.compact > strong {
   font-size: 16px;
   font-weight: 500;
+}
+
+/* Summary > Recurring: one tappable row per bill under its group line. */
+.recurring-item-row {
+  width: 100%;
+  min-height: 44px;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  padding: 10px 0 0 12px;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.recurring-item-row > span {
+  min-width: 0;
+}
+
+.recurring-item-row > span strong {
+  overflow-wrap: anywhere;
+}
+
+.recurring-status {
+  flex: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.recurring-item-row.paid .recurring-status {
+  color: var(--mint-dark);
+}
+
+.recurring-confirm-due {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.transaction-edit-grid.recurring-confirm-grid {
+  grid-template-columns: 1fr;
+  margin-bottom: 14px;
 }
 
 .recurring-row.editing {

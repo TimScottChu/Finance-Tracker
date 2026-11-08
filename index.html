@@ -86,7 +86,7 @@
           </section>
 
           <section class="panel">
-            <button class="recurring-summary summary-total-line" id="summary-recurring-toggle" type="button" aria-label="Show recurring group totals">
+            <button class="recurring-summary summary-total-line" id="summary-recurring-toggle" type="button" aria-label="Show recurring bills">
               <strong>Recurring Total</strong>
               <strong id="summary-recurring-total">PHP 0.00</strong>
             </button>
@@ -392,6 +392,28 @@
 
         <button class="primary-button" type="submit">Save changes</button>
         <button class="delete-transaction-button" id="delete-transaction" type="button">Delete transaction</button>
+      </form>
+    </div>
+
+    <div class="modal-backdrop hidden" id="recurring-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="recurring-confirm-title">
+      <form class="modal-card" id="recurring-confirm-form">
+        <div class="section-heading">
+          <h2 id="recurring-confirm-title">Recurring bill</h2>
+          <button class="text-button" id="close-recurring-confirm" type="button">Cancel</button>
+        </div>
+        <p class="recurring-confirm-due" id="recurring-confirm-due"></p>
+        <div class="transaction-edit-grid recurring-confirm-grid">
+          <div class="form-control">
+            <span>Amount</span>
+            <div class="transaction-amount-input" data-calculator-target="recurring-confirm-amount" role="button" tabindex="0" aria-label="Open amount calculator">
+              <strong id="recurring-confirm-prefix">- PHP</strong>
+              <input id="recurring-confirm-amount" inputmode="none" readonly required />
+              <button class="calculator-open" type="button" aria-label="Open calculator">=</button>
+            </div>
+          </div>
+        </div>
+        <button class="primary-button" id="recurring-confirm-submit" type="submit">Confirm</button>
+        <button class="delete-transaction-button hidden" id="recurring-confirm-undo" type="button">Undo confirmation</button>
       </form>
     </div>
 
