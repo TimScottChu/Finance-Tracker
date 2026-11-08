@@ -231,6 +231,7 @@ const els = {
   clearFeedback: document.querySelector("#clear-feedback"),
   exportFeedback: document.querySelector("#export-feedback"),
   backupNudge: document.querySelector("#backup-nudge"),
+  backupNudgeDismiss: document.querySelector("#backup-nudge-dismiss"),
   storageError: document.querySelector("#storage-error"),
   lastBackup: document.querySelector("#last-backup")
 };
@@ -443,6 +444,7 @@ function bindEvents() {
   els.exportCsv.addEventListener("click", exportCsv);
   els.exportAssetsCsv.addEventListener("click", exportAssetsCsv);
   els.exportBackup.addEventListener("click", exportBackup);
+  els.backupNudgeDismiss.addEventListener("click", snoozeBackupNudge);
   els.importBackup.addEventListener("change", importBackup);
   els.togglePaymentMethodsEdit.addEventListener("click", () => {
     paymentMethodsEditMode = !paymentMethodsEditMode;
@@ -1909,6 +1911,17 @@ function loadMeta() {
   }
 }
 
+function localDateKey(date = new Date()) {
+  const pad = (n) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+// Hide the reminder through the end of today (local); it may return from tomorrow.
+function snoozeBackupNudge() {
+  setStoredItem(META_STORAGE_KEY, JSON.stringify({ ...loadMeta(), backupNudgeSnoozedUntil: localDateKey() }));
+  renderBackupStatus();
+}
+
 function renderBackupStatus() {
   const lastBackupAt = new Date(loadMeta().lastBackupAt || "");
   const hasBackup = !Number.isNaN(lastBackupAt.getTime());
@@ -1916,7 +1929,9 @@ function renderBackupStatus() {
     ? `Last backup: ${lastBackupAt.toLocaleString("en-PH", { dateStyle: "long", timeStyle: "short" })}`
     : "Last backup: never";
   const isStale = !hasBackup || Date.now() - lastBackupAt.getTime() > BACKUP_NUDGE_DAYS * 24 * 60 * 60 * 1000;
-  els.backupNudge.classList.toggle("hidden", !isStale);
+  const snoozedUntil = loadMeta().backupNudgeSnoozedUntil;
+  const isSnoozed = typeof snoozedUntil === "string" && localDateKey() <= snoozedUntil;
+  els.backupNudge.classList.toggle("hidden", !isStale || isSnoozed);
 }
 
 function savePreImportSnapshot() {
