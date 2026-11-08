@@ -353,7 +353,8 @@ main {
   color: transparent;
 }
 
-.amounts-hidden #edit-transaction-amount {
+.amounts-hidden #edit-transaction-amount,
+.amounts-hidden #recurring-confirm-amount {
   border-radius: 4px;
   color: transparent !important;
   -webkit-text-fill-color: transparent;
@@ -607,6 +608,54 @@ main {
 .recurring-row.compact > strong {
   font-size: 16px;
   font-weight: 500;
+}
+
+/* Summary > Recurring: one tappable row per bill under its group line. */
+.recurring-item-row {
+  width: 100%;
+  min-height: 44px;
+  border-right: 0;
+  border-bottom: 0;
+  border-left: 0;
+  padding: 10px 0 0 12px;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.recurring-item-row > span {
+  min-width: 0;
+}
+
+.recurring-item-row > span strong {
+  overflow-wrap: anywhere;
+}
+
+.recurring-status {
+  flex: none;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.recurring-item-row.paid .recurring-status {
+  color: var(--mint-dark);
+}
+
+.recurring-confirm-due {
+  margin: 0 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.transaction-edit-grid.recurring-confirm-grid {
+  grid-template-columns: 1fr;
+  margin-bottom: 14px;
 }
 
 .recurring-row.editing {
@@ -1594,6 +1643,32 @@ textarea::placeholder {
   border: 1px solid var(--amber);
   font-size: 13px;
   line-height: 1.35;
+}
+
+.backup-nudge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+.backup-nudge p {
+  flex: 1;
+  margin: 0;
+}
+
+.nudge-dismiss {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  margin: -8px 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 26px;
+  line-height: 1;
+  cursor: pointer;
 }
 
 .notice-error {

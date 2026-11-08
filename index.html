@@ -8,7 +8,7 @@
     <meta name="color-scheme" content="light dark" />
     <title>Finance Tracker</title>
     <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="stylesheet" href="styles.css?v=40" />
+    <link rel="stylesheet" href="styles.css?v=41" />
   </head>
   <body>
     <div class="app-shell">
@@ -42,7 +42,10 @@
       <p class="app-notice notice-error hidden" id="storage-error" role="alert">
         Changes could not be saved on this device. Export a backup JSON from Settings now.
       </p>
-      <p class="app-notice hidden" id="backup-nudge">No backup in the last 7 days. Export a backup JSON from Settings.</p>
+      <div class="app-notice backup-nudge hidden" id="backup-nudge">
+        <p>No backup in the last 7 days. Export a backup JSON from Settings.</p>
+        <button type="button" class="nudge-dismiss" id="backup-nudge-dismiss" aria-label="Dismiss reminder">&times;</button>
+      </div>
 
       <main>
         <section class="screen active" id="summary-screen" aria-labelledby="summary-tab">
@@ -83,7 +86,7 @@
           </section>
 
           <section class="panel">
-            <button class="recurring-summary summary-total-line" id="summary-recurring-toggle" type="button" aria-label="Show recurring group totals">
+            <button class="recurring-summary summary-total-line" id="summary-recurring-toggle" type="button" aria-label="Show recurring bills">
               <strong>Recurring Total</strong>
               <strong id="summary-recurring-total">PHP 0.00</strong>
             </button>
@@ -292,7 +295,7 @@
         </section>
 
         <section class="screen" id="settings-screen" aria-labelledby="settings-tab">
-          <p class="app-version">App version v40</p>
+          <p class="app-version">App version v41</p>
           <p class="app-version" id="last-backup">Last backup: never</p>
           <section class="export-grid">
             <button class="export-tile export-wide" id="export-csv" type="button">Export transactions CSV</button>
@@ -392,6 +395,28 @@
       </form>
     </div>
 
+    <div class="modal-backdrop hidden" id="recurring-confirm-modal" role="dialog" aria-modal="true" aria-labelledby="recurring-confirm-title">
+      <form class="modal-card" id="recurring-confirm-form">
+        <div class="section-heading">
+          <h2 id="recurring-confirm-title">Recurring bill</h2>
+          <button class="text-button" id="close-recurring-confirm" type="button">Cancel</button>
+        </div>
+        <p class="recurring-confirm-due" id="recurring-confirm-due"></p>
+        <div class="transaction-edit-grid recurring-confirm-grid">
+          <div class="form-control">
+            <span>Amount</span>
+            <div class="transaction-amount-input" data-calculator-target="recurring-confirm-amount" role="button" tabindex="0" aria-label="Open amount calculator">
+              <strong id="recurring-confirm-prefix">- PHP</strong>
+              <input id="recurring-confirm-amount" inputmode="none" readonly required />
+              <button class="calculator-open" type="button" aria-label="Open calculator">=</button>
+            </div>
+          </div>
+        </div>
+        <button class="primary-button" id="recurring-confirm-submit" type="submit">Confirm</button>
+        <button class="delete-transaction-button hidden" id="recurring-confirm-undo" type="button">Undo confirmation</button>
+      </form>
+    </div>
+
     <div class="modal-backdrop hidden" id="card-detail-modal" role="dialog" aria-modal="true" aria-labelledby="card-detail-title">
       <section class="modal-card">
         <div class="section-heading">
@@ -440,6 +465,6 @@
       </section>
     </div>
 
-    <script src="app.js?v=40"></script>
+    <script src="app.js?v=41"></script>
   </body>
 </html>
